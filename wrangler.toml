@@ -1,13 +1,3 @@
-name = "token-validator-worker" # <-- NAMA INI SANGAT PENTING
+name = "simple-websocket"
+compatibility_date = "2024-07-21"
 main = "src/index.ts"
-compatibility_date = "2023-11-21"
-
-# Ini adalah bagian untuk MENDEFINISIKAN Durable Object
-[durable_objects]
-bindings = [
-  { name = "VALIDATORS_DO", class_name = "TokenValidator" }
-]
-
-[[migrations]]
-tag = "v1"
-new_classes = ["TokenValidator"]
