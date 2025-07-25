@@ -1,21 +1,27 @@
-# Nama proyek Anda di Cloudflare
-name = "m"
+# Nama proyek Worker Anda
+name = "m" # Beri nama baru agar tidak konflik
 
-# Memberitahu Cloudflare Pages bahwa file statis (HTML, CSS, JS) ada di direktori root.
-pages_build_output_dir = "."
+# Titik masuk utama untuk kode Worker Anda
+main = "src/index.js"
 
-# BARIS BARU: Menentukan file Worker utama. Ini adalah inti dari migrasi.
-main = "_worker.js"
-
-# Tanggal kompatibilitas untuk memastikan API berfungsi seperti yang diharapkan
+# Tanggal kompatibilitas
 compatibility_date = "2024-03-20"
-#compatibility_flags = ["nodejs_compat"]
 
-# Konfigurasi binding ke KV Namespace Anda (Sudah benar)
+# --- BAGIAN KUNCI UNTUK ASET STATIS ---
+# Memberitahu Worker untuk menyajikan file dari direktori "public"
+[site]
+bucket = "./public"
+
+# Binding KV Anda (tetap sama)
 [[kv_namespaces]]
-binding = "TOKEN" # Nama variabel yang akan digunakan di dalam Functions
-id = "e4b68d7dd477413fbe140f59259254c7" # ID KV Namespace Anda
+binding = "TOKEN"
+id = "e4b68d7dd477413fbe140f59259254c7"
 
 [[kv_namespaces]]
 binding = "ADMIN"
 id = "65af14e6ce5f4aad928fc3e474c8642e"
+
+# Binding Durable Object Anda (jika Anda menambahkannya)
+# [[durable_objects.bindings]]
+# name = "COUNTER_DO"
+# class_name = "Counter"
