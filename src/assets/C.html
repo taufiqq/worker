@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>UI Game Balap Kustom</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+     <script src="/script.js" defer></script>
+</head>
+<body>
+    <div id="orientation-lock">
+      <div> <!-- Wrapper baru untuk konten -->
+            <p>🔄<br><br>Harap putar perangkat Anda ke posisi landscape untuk bermain.</p>
+            <button id="start-fullscreen-btn" style="padding: 15px 30px; font-size: 1.2em; border-radius: 10px; border: none; background-color: #4CAF50; color: white; cursor: pointer;">Mulai</button>
+            <p style="font-size: 0.8em; color: #ccc; margin-top: 20px;">(Ini akan mengaktifkan mode fullscreen)</p>
+        </div>
+       
+    </div>
+
+    <!-- SEMUA KONTROL GAME DIBUNGKUS DI SINI -->
+  <div class="game-controls">
+
+    <!-- Display untuk melihat data -->
+    <div id="debug-display"></div>
+
+    <!-- KONTROL KIRI -->
+    <div class="steering-control">
+        <div class="control-zone steering-zone" data-axis="x">
+            <div id="steering-handle" class="movable-control">
+                <!-- SVG BARU UNTUK SETIR (SESUAI PERMINTAAN ANDA) -->
+                <!-- Atribut fill="#000000" sudah dihapus agar bisa di-style oleh CSS -->
+                <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                    <g><g>
+                        <path d="M91.8,153.1c-6,0-12,0.1-18.1-0.1c-3.5-0.1-5,0.9-4.8,4.6c0.2,4.9,0.2,9.8,0,14.8c-0.1,1.7-0.6,4.1-1.7,4.7c-1.1,0.6-3.6-0.3-4.8-1.4c-16.7-14.4-33.3-29-49.9-43.5c-3.5-3.1-3.1-5.8,0.2-8.6c16.5-14.4,33-28.8,49.6-43.1c1.3-1.1,3.5-1.3,5.3-1.9c0.5,1.7,1.3,3.3,1.4,5c0.2,4.7,0.2,9.5,0,14.2c-0.2,4,1.2,5.5,5.3,5.4c11.7-0.2,23.4-0.1,35,0c6.3,0,7.8,1.4,7.9,7.7c0.1,11.7-0.1,23.4,0.1,35c0.1,5.2-2.4,7.2-7.3,7.2C103.8,153,97.8,153.1,91.8,153.1z"/>
+                        <path d="M186.8,153.1c-13.8,0-26.6,0-39.4,0c-7.6,0-8.4-0.7-8.4-8.5c0-11.3-0.1-22.6,0-34c0-6.3,1.2-7.4,7.4-7.4c11.9,0,23.7-0.1,35.6,0c3.5,0,4.9-1.1,4.8-4.7c-0.2-5.1-0.2-10.2,0.1-15.3c0.1-1.6,0.7-3.7,1.9-4.6c0.7-0.5,3.2,0.4,4.3,1.3c17,14.7,33.8,29.5,50.7,44.3c3.1,2.7,2.8,5.1-0.1,7.7c-16.8,14.6-33.5,29.3-50.3,43.9c-1.1,0.9-3.5,2-4.2,1.4c-1.2-0.8-2.1-2.9-2.1-4.5C186.7,166.5,186.8,160.1,186.8,153.1z"/>
+                    </g></g>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- KONTROL KANAN -->
+    <div class="pedals-control">
+        <div id="brake-pedal" class="pedal">
+            <!-- SVG untuk Pedal Rem (Tidak Berubah) -->
+            <svg class="pedal-svg" viewBox="0 0 80 120">
+                <rect x="5" y="5" width="70" height="110" rx="15" fill="rgba(200, 50, 50, 0.7)" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+                <text x="40" y="70" font-size="24" fill="white" text-anchor="middle" font-weight="bold"></text>
+            </svg>
+        </div>
+        <div id="mulai-gas" class="control-zone gas-zone" data-axis="y">
+            <div id="gas-pedal" class="movable-control pedal">
+                <!-- SVG BARU UNTUK PEDAL GAS (Model "Tiga Garis") -->
+                <svg class="pedal-svg" viewBox="0 0 80 120">
+                    <!-- Background pedal -->
+                    <rect x="5" y="5" width="70" height="110" rx="15" fill="rgba(0, 0, 0, 0.7)" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+                    <!-- Ikon Tiga Garis -->
+                    <g fill="rgba(255,255,255,0.8)">
+                        <rect x="15" y="40" width="50" height="8" rx="4"></rect>
+                        <rect x="15" y="56" width="50" height="8" rx="4"></rect>
+                        <rect x="15" y="72" width="50" height="8" rx="4"></rect>
+                    </g>
+                </svg>
+            </div>
+        </div>
+    </div>
+  </div>
+ 
+</body>
+</html>

@@ -1,0 +1,170 @@
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #333;
+            background-image: url('https://images.unsplash.com/photo-1614729589139-8a3568323867?q=80&w=1974');
+            background-size: cover;
+            background-position: center;
+            font-family: sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ZONA INTERAKSI (AREA SENTUH) */
+        .control-zone {
+            background-color: transparent; /* Transparan */
+            border: 2px solid rgba(255, 255, 255, 0.4); /* Hanya border terlihat */
+            position: relative;
+            border-radius: 20px;
+            touch-action: none;
+        }
+        
+        /* KONTROL KIRI (SETIR) */
+        .steering-control {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+        }
+        .steering-zone { 
+            width: 200px; /* Ukuran tetap px */
+            height: 50px; 
+        }
+
+        /* KONTROL KANAN (PEDAL) */
+        .pedals-control {
+            position: absolute;
+            bottom: 30px;
+            right: 50px;
+            display: flex;
+            align-items: flex-end; /* Pedal rata bawah */
+            gap: 10px;
+        }
+        .gas-zone { 
+            width: 50px; 
+            height: 200px; 
+        }
+
+        /* ELEMEN YANG DAPAT DIGERAKKAN (SETIR & GAS) */
+        .movable-control {
+            position: absolute;
+            pointer-events: none; 
+            user-select: none;
+            transition: top 0.2s ease-out, left 0.2s ease-out;
+        }
+        .movable-control.is-active {
+            transition: none;
+        }
+
+        /* TAMPILAN SETIR BARU ("BURGER") */
+        #steering-handle {
+            width: 50px;  /* Dibuat persegi agar ikon pas */
+            height: 50px; /* Dibuat persegi agar ikon pas */
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #steering-handle svg {
+            width: 100%;
+            height: 100%;
+            fill: rgba(255, 255, 255, 0.7);
+        }
+        #steering-handle.is-active svg {
+            fill: rgba(255, 255, 255, 1);
+        }
+        
+        /* TAMPILAN PEDAL BARU (SVG) */
+        .pedal {
+            cursor: pointer;
+            transition: transform 0.1s ease, filter 0.1s ease;
+        }
+        .pedal.is-active {
+            transform: translateY(5px) scale(0.98); /* Efek ditekan ke bawah */
+            filter: brightness(1.2); /* Sedikit lebih terang */
+        }
+
+        #gas-pedal {
+            width: 50px;
+            height: 90px;
+            left: 50%;
+            top: calc(100% - 40px); /* Posisi awal di bawah */
+            transform: translate(-50%, -50%);
+        }
+        
+        #brake-pedal {
+            width: 50px;
+            height: 90px;
+        }
+        
+        .pedal-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Styling untuk display data */
+        #debug-display {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            z-index: 100;
+            white-space: pre; /* Agar baris baru (\n) berfungsi */
+        }
+        
+  /* --- Tambahkan kode ini di akhir style.css --- */
+
+/* 1. Wrapper untuk semua kontrol game */
+.game-controls {
+    /* Properti ini akan diatur oleh media query di bawah */
+    display: none; /* Sembunyikan secara default */
+    width: 100%;
+    height: 100%;
+}
+
+/* 2. Overlay untuk mode portrait */
+#orientation-lock {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #222;
+    color: white;
+    z-index: 9999;
+    display: flex; /* Akan diatur oleh media query */
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-size: 1.2em;
+    font-family: sans-serif;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* 3. Media Query untuk mengatur tampilan berdasarkan orientasi */
+
+/* JIKA LANDSCAPE: Tampilkan game, sembunyikan pesan */
+@media (orientation: landscape) {
+    #orientation-lock {
+        display: none;
+    }
+    .game-controls {
+        display: block;
+    }
+}
+
+/* JIKA PORTRAIT: Tampilkan pesan, sembunyikan game (sudah default) */
+@media (orientation: portrait) {
+    #orientation-lock {
+        display: flex;
+    }
+    .game-controls {
+        display: none;
+    }
+}
