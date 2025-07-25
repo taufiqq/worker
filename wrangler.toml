@@ -1,5 +1,5 @@
 # Nama proyek Anda di Cloudflare
-name = "cloudflare-web"
+name = "m"
 
 # Memberitahu Cloudflare Pages bahwa file statis (HTML, CSS, JS) ada di direktori root.
 pages_build_output_dir = "."
