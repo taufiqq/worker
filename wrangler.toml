@@ -1,26 +1,21 @@
-name = "m" # Nama unik untuk Worker Anda
-main = "src/worker.js"    # Path ke file Worker utama Anda
-compatibility_date = "2024-03-20"
-# compatibility_flags = ["nodejs_compat"] # Aktifkan ini jika Anda menggunakan fitur Node.js yang spesifik
+# Nama proyek Anda di Cloudflare
+name = "cloudflare-web"
 
-# Konfigurasi KV Namespaces Anda (SAMA DENGAN SEBELUMNYA)
+# Memberitahu Cloudflare Pages bahwa file statis (HTML, CSS, JS) ada di direktori root.
+pages_build_output_dir = "."
+
+# BARIS BARU: Menentukan file Worker utama. Ini adalah inti dari migrasi.
+main = "_worker.js"
+
+# Tanggal kompatibilitas untuk memastikan API berfungsi seperti yang diharapkan
+compatibility_date = "2024-03-20"
+#compatibility_flags = ["nodejs_compat"]
+
+# Konfigurasi binding ke KV Namespace Anda (Sudah benar)
 [[kv_namespaces]]
-binding = "TOKEN"
-id = "e4b68d7dd477413fbe140f59259254c7" # GANTI DENGAN ID KV NAMESPACE TOKEN ANDA
+binding = "TOKEN" # Nama variabel yang akan digunakan di dalam Functions
+id = "e4b68d7dd477413fbe140f59259254c7" # ID KV Namespace Anda
 
 [[kv_namespaces]]
 binding = "ADMIN"
-id = "65af14e6ce5f4aad928fc3e474c8642e" # GANTI DENGAN ID KV NAMESPACE ADMIN ANDA
-
-# Anda mungkin ingin menambahkan binding untuk `__STATIC_CONTENT`
-# Ini adalah binding khusus yang digunakan oleh @cloudflare/kv-asset-handler
-# ID ini akan dibuat otomatis saat Anda menjalankan `wrangler pages dev --binding <your-worker-name>`
-# atau ketika Anda menghubungkan proyek Cloudflare Pages ke Worker Anda
-# Jika Anda *tidak* menggunakan `kv-asset-handler` dan hanya menyematkan aset, ini tidak perlu.
-# Jika Anda mengelola aset statis secara manual dari KV, Anda bisa mendefinisikan KV namespace lain.
-# Jika Anda mengintegrasikan dengan Pages (seperti Pages Functions), Anda bisa menggunakan binding __STATIC_CONTENT
-# Untuk Worker murni, kita akan menyematkan aset. Jadi, bagian ini tidak terlalu relevan.
-
-# routes = [ # Anda bisa mendefinisikan rute di sini, tapi seringkali lebih fleksibel di dalam Worker
-#   { pattern = "yourdomain.com/*", custom_domain = true }
-# ]
+id = "65af14e6ce5f4aad928fc3e474c8642e"
