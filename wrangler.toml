@@ -1,33 +1,7 @@
 # File: wrangler.toml
 
 name = "m"
-main = "src/index.js"
+main = "src/index.ts"
 compatibility_date = "2023-12-01"
 
-[site]
-bucket = "./static"
 
-
-# ----------------- BAGIAN BARU UNTUK DURABLE OBJECTS -----------------
-# Ini memberitahu Cloudflare bahwa kita akan menggunakan Durable Objects.
-[durable_objects]
-# 'bindings' mendefinisikan cara kita akan memanggil Object ini dari Worker utama.
-# 'TOKEN_LOCKER' adalah nama variabel yang akan kita gunakan dalam kode.
-# 'TokenLocker' adalah nama class JavaScript yang akan kita buat.
-bindings = [
-  { name = "TOKEN_LOCKER", class_name = "TokenLocker" }
-]
-
-
-
-# ----------------- BAGIAN BARU UNTUK MIGRASI -----------------
-# Ini diperlukan agar Cloudflare tahu cara mendeploy Durable Object.
-# Setiap kali Anda mengubah class Durable Object, Anda mungkin perlu membuat migrasi baru,
-# tapi untuk pembuatan awal, ini sudah cukup.
-[[migrations]]
-tag = "v1" # Versi migrasi Anda
-new_sqlite_classes = ["TokenLocker"] # Daftar class baru yang dideploy di versi ini
-
-[[kv_namespaces]]
-binding = "TOKEN_DB"
-id = "e4b68d7dd477413fbe140f59259254c7" # Ganti dengan ID namespace Anda
