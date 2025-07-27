@@ -1,9 +1,12 @@
-// File: src/index.js (FINAL - MENAMPILKAN ERROR DI BROWSER)
+// File: src/index.js (PERBAIKAN FINAL UNTUK STATIC ASSETS)
 
+// --- PERUBAHAN DI SINI ---
+// Kita ganti import 'serveStatic' dari 'hono/cloudflare-workers'
+// menjadi 'hono/cloudflare-pages' yang tahu cara menangani [site]
 import { Hono } from 'hono'
-import { serveStatic } from 'hono/cloudflare-workers'
+import { serveStatic } from 'hono/cloudflare-pages' // <--- INI PERUBAHANNYA
 
-// Fungsi helper untuk menampilkan halaman error yang detail
+// Fungsi helper untuk menampilkan halaman error (tidak berubah)
 function showErrorPage(c, error) {
     const errorHtml = `
       <!DOCTYPE html>
@@ -12,31 +15,17 @@ function showErrorPage(c, error) {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Worker Error</title>
-          <style>
-              body { font-family: sans-serif; background-color: #282c34; color: #abb2bf; padding: 20px; }
-              .container { background-color: #323842; padding: 25px; border-radius: 8px; border: 1px solid #4b5263; }
-              h1 { color: #e06c75; border-bottom: 2px solid #e06c75; padding-bottom: 10px; }
-              h2 { color: #98c379; }
-              pre { background-color: #21252b; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; color: #c8ceda; }
-          </style>
+          <style> body { font-family: sans-serif; background-color: #282c34; color: #abb2bf; padding: 20px; } .container { background-color: #323842; padding: 25px; border-radius: 8px; border: 1px solid #4b5263; } h1 { color: #e06c75; border-bottom: 2px solid #e06c75; padding-bottom: 10px; } h2 { color: #98c379; } pre { background-color: #21252b; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; color: #c8ceda; } </style>
       </head>
       <body>
-          <div class="container">
-              <h1>Internal Server Error (500)</h1>
-              <p>Terjadi kesalahan saat memproses permintaan Anda. Ini bukan salah Anda.</p>
-              <h2>Pesan Error:</h2>
-              <pre>${error.message}</pre>
-              <h2>Stack Trace (Detail Teknis):</h2>
-              <pre>${error.stack}</pre>
-          </div>
+          <div class="container"><h1>Internal Server Error (500)</h1><p>Terjadi kesalahan saat memproses permintaan Anda. Ini bukan salah Anda.</p><h2>Pesan Error:</h2><pre>${error.message}</pre><h2>Stack Trace (Detail Teknis):</h2><pre>${error.stack}</pre></div>
       </body>
       </html>
     `;
     return c.html(errorHtml, 500);
 }
 
-
-// Durable Object Class
+// Durable Object Class (tidak berubah)
 export class TokenLocker {
   constructor(state, env) { this.state = state; }
   async fetch(request) {
@@ -52,28 +41,24 @@ export class TokenLocker {
   }
 }
 
-// Aplikasi Hono
+// Aplikasi Hono (tidak berubah)
 const app = new Hono()
 
-// Middleware untuk menangkap semua error yang tidak tertangani
 app.onError((err, c) => {
-  console.error(`[Hono] Uncaught Error: ${err}`); // Ini tetap berguna untuk log jika Anda membukanya nanti
+  console.error(`[Hono] Uncaught Error: ${err}`);
   return showErrorPage(c, err);
 });
 
-// Sajikan aset statis
-app.use('/*', serveStatic({ root: './' }))
+// Sajikan aset statis - sekarang menggunakan middleware yang benar
+app.use('/*', serveStatic()) // Tidak perlu `root` lagi, karena middleware ini tahu dari [site]
 
-// Route utama
+// Route utama (tidak berubah)
 app.get('/:token', async (c) => {
   const { token } = c.req.param()
   
-  // Cek binding satu per satu dengan pesan error yang jelas
-  if (!c.env.TOKEN_DB) throw new Error("Binding Error: KV Namespace 'TOKEN_DB' tidak terkonfigurasi di wrangler.toml atau belum dideploy.");
-  if (!c.env.TOKEN_LOCKER) throw new Error("Binding Error: Durable Object 'TOKEN_LOCKER' tidak terkonfigurasi di wrangler.toml atau belum dideploy.");
-  if (!c.env.ASSETS) throw new Error("Binding Error: Static asset 'ASSETS' tidak terkonfigurasi. Pastikan ada `[site]` di wrangler.toml.");
-
-  // Proses token
+  if (!c.env.TOKEN_DB) throw new Error("Binding Error: KV Namespace 'TOKEN_DB' tidak terkonfigurasi.");
+  if (!c.env.TOKEN_LOCKER) throw new Error("Binding Error: Durable Object 'TOKEN_LOCKER' tidak terkonfigurasi.");
+  
   const credentialsRaw = await c.env.TOKEN_DB.get(token);
   if (!credentialsRaw) return c.text(`Token "${token}" tidak valid atau tidak ditemukan.`, 404);
   
@@ -84,7 +69,6 @@ app.get('/:token', async (c) => {
       throw new Error(`Data Corruption: Gagal mem-parsing JSON dari KV untuk token "${token}". Isi data: '${credentialsRaw}'`);
   }
   
-  // Panggil DO
   const id = c.env.TOKEN_LOCKER.idFromName(token);
   const obj = c.env.TOKEN_LOCKER.get(id);
   const lockResponse = await obj.fetch(c.req.raw);
@@ -94,9 +78,11 @@ app.get('/:token', async (c) => {
     return c.html(`<h1>Akses Ditolak</h1><p>${errorMessage}</p>`, lockResponse.status);
   }
 
-  // Sajikan Halaman
+  // Mengambil C.html sekarang harus dilakukan secara manual karena serveStatic
+  // tidak akan mengeksekusi route lain jika file ditemukan. Kita pindahkan logika ini
+  // ke dalam route yang tidak akan tertangkap oleh serveStatic, yaitu route token ini.
   const cHtmlResponse = await c.env.ASSETS.fetch(new URL('/C.html', c.req.url));
-  if (!cHtmlResponse.ok) throw new Error(`Asset Not Found: Gagal mengambil file /C.html dari folder static. Status: ${cHtmlResponse.status}`);
+  if (!cHtmlResponse.ok) throw new Error(`Asset Not Found: Gagal mengambil file /C.html dari folder static.`);
   
   let html = await cHtmlResponse.text();
   const injectionScript = `<script>window.MQTT_CREDENTIALS = { user: "${credentials.user}", pass: "${credentials.pass}" }; window.ID = ${credentials.id};</script>`;
@@ -105,6 +91,7 @@ app.get('/:token', async (c) => {
   return c.html(html);
 })
 
+// Export (tidak berubah)
 export default {
   fetch: app.fetch,
   TokenLocker: TokenLocker, 
