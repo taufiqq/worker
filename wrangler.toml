@@ -4,6 +4,10 @@ name = "m"
 main = "src/index.js"
 compatibility_date = "2023-12-01"
 
+[site]
+bucket = "./static"
+
+
 # ----------------- BAGIAN BARU UNTUK DURABLE OBJECTS -----------------
 # Ini memberitahu Cloudflare bahwa kita akan menggunakan Durable Objects.
 [durable_objects]
@@ -14,6 +18,8 @@ bindings = [
   { name = "TOKEN_LOCKER", class_name = "TokenLocker" }
 ]
 
+
+
 # ----------------- BAGIAN BARU UNTUK MIGRASI -----------------
 # Ini diperlukan agar Cloudflare tahu cara mendeploy Durable Object.
 # Setiap kali Anda mengubah class Durable Object, Anda mungkin perlu membuat migrasi baru,
@@ -23,5 +29,5 @@ tag = "v1" # Versi migrasi Anda
 new_sqlite_classes = ["TokenLocker"] # Daftar class baru yang dideploy di versi ini
 
 [[kv_namespaces]]
-binding = "TOKEN_INDEX"
-id = "c8d3806fbe924bfbb68ec69779cccdbb" # Ganti dengan ID namespace Anda
+binding = "TOKEN_DB"
+id = "e4b68d7dd477413fbe140f59259254c7" # Ganti dengan ID namespace Anda
