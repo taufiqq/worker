@@ -5,3 +5,11 @@ main = "src/index.ts"
 compatibility_date = "2023-12-01"
 
 
+
+
+
+
+
+[[migrations]]
+tag = "your-unique-migration-tag" # Use a unique tag, e.g., "v3", "tokenlocker-delete-v1"
+deleted_classes = ["TokenLocker"]
