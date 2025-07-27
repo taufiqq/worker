@@ -1,19 +1,14 @@
 # File: wrangler.toml
 
 name = "m"
-main = "worker.js"
+main = "src/index.js"
 compatibility_date = "2023-12-01"
 
 
 [assets]
 directory = "./public"
-not_found_handling = "single-page-application"
-
-
-
 
 
 
 [[migrations]]
-tag = "your-unique-migration-tag" # Use a unique tag, e.g., "v3", "tokenlocker-delete-v1"
-deleted_classes = ["TokenLocker"]
+tag = "your-unique-migration-tag"
