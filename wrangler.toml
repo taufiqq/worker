@@ -6,7 +6,7 @@ compatibility_date = "2023-12-01"
 
 
 [assets]
-directory = "./dist"
+directory = "./public"
 not_found_handling = "single-page-application"
 
 
