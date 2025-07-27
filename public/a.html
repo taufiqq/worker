@@ -1,0 +1,21 @@
+<!-- public/a.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template A</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 2em; }
+        .injected { background-color: #ffebcd; border: 1px solid #e0c8a8; padding: 15px; margin-top: 20px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Ini adalah konten asli dari a.html</h1>
+    <p>Konten di bawah ini akan disuntikkan oleh Cloudflare Worker.</p>
+    
+    <!-- Kita akan menargetkan elemen ini untuk disuntikkan -->
+    <div id="injection-point"></div>
+
+</body>
+</html>

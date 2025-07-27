@@ -4,69 +4,66 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
-// Handler untuk rute API tetap sama
-app.get('/api/*', (c) => {
-  return c.json({
-    name: 'Cloudflare',
-    framework: 'Hono',
-    message: 'This is a response from an API route!',
-  });
-});
+// Definisikan handler untuk HTMLRewriter
+// Kelas ini akan menyuntikkan konten ke dalam elemen dengan id="injection-point"
+class ContentInjector {
+  constructor(dynamicData) {
+    this.data = dynamicData;
+  }
 
-/**
- * Definisikan handler untuk HTMLRewriter.
- * Kelas ini akan menambahkan sebuah elemen ke akhir <body>.
- */
-class ElementInjector {
-  // Metode `element` akan dipanggil untuk setiap elemen yang cocok dengan selector.
   element(element) {
-    const visitorIp = element.getAttribute('data-visitor-ip'); // Mengambil atribut dari element target
     const injectedHtml = `
-      <div style="background-color: #f0f8ff; border: 1px solid #b0c4de; padding: 15px; margin-top: 20px; border-radius: 5px;">
-        <h2>✨ Content Injected by Cloudflare Worker!</h2>
-        <p>This section was added dynamically using HTMLRewriter.</p>
-        <p>Your IP address is: <strong>${visitorIp}</strong></p>
+      <div class="injected">
+        <h2>✨ Konten Dinamis Berhasil Disuntikkan!</h2>
+        <p>Pesan ini dibuat secara on-the-fly oleh Worker.</p>
+        <p>Waktu Server: <strong>${this.data.timestamp}</strong></p>
+        <p>Lokasi Pengunjung (Colo): <strong>${this.data.colo}</strong></p>
       </div>
     `;
-    
-    // Menyisipkan HTML di akhir elemen body
-    element.append(injectedHtml, { html: true });
+    element.setInnerContent(injectedHtml, { html: true });
   }
 }
 
-// Handler notFound sekarang menjadi async karena kita perlu 'await' fetch
-app.notFound(async (c) => {
-  // 1. Ambil aset statis seperti biasa
-  const assetResponse = await c.env.ASSETS.fetch(c.req.raw);
+// Rute utama untuk menangani permintaan ke "/"
+app.get('/', async (c) => {
+  // 1. Buat URL absolut ke file a.html yang ada di dalam aset statis.
+  //    Penting: fetch() di dalam worker memerlukan URL lengkap atau objek Request.
+  const assetUrl = new URL(c.req.url);
+  assetUrl.pathname = '/a.html'; // Tunjuk ke file yang kita inginkan
 
-  // 2. Periksa apakah itu file HTML. Kita hanya ingin memodifikasi HTML.
-  const contentType = assetResponse.headers.get('Content-Type');
-  if (contentType && contentType.toLowerCase().includes('text/html')) {
-    
-    // 3. Jika itu HTML, buat instance HTMLRewriter
-    const rewriter = new HTMLRewriter();
+  // 2. Ambil file a.html dari binding ASSETS
+  const assetResponse = await c.env.ASSETS.fetch(assetUrl.toString());
 
-    // Dapatkan IP pengunjung dari header
-    const visitorIp = c.req.header('CF-Connecting-IP') || 'Not available';
-
-    // 4. Ubah respons dengan menambahkan handler kita
-    //    - '.on('body', ...)' menargetkan elemen <body>
-    //    - 'new ElementInjector()' adalah handler yang akan melakukan perubahan
-    //    - '.transform(assetResponse)' menerapkan transformasi ke stream respons
-    return rewriter
-      .on('body', {
-        element: (el) => {
-            // Kita bisa menambahkan data dinamis sebagai atribut
-            // sebelum handler kita dieksekusi.
-            el.setAttribute('data-visitor-ip', visitorIp);
-        }
-      })
-      .on('body', new ElementInjector())
-      .transform(assetResponse);
+  // Pastikan file berhasil diambil sebelum melanjutkan
+  if (!assetResponse.ok) {
+    return c.text('Error: a.html tidak dapat ditemukan di aset.', 500);
   }
 
-  // 5. Jika bukan HTML (misalnya CSS, JS, gambar), kembalikan aset apa adanya.
-  return assetResponse;
+  // 3. Kumpulkan data dinamis yang ingin disuntikkan
+  const dynamicData = {
+    timestamp: new Date().toUTCString(),
+    colo: c.req.cf?.colo || 'N/A', // Ambil kode bandara dari Cloudflare
+  };
+  
+  // 4. Buat instance HTMLRewriter dan terapkan transformasi
+  const rewriter = new HTMLRewriter();
+  
+  return rewriter
+    // Targetkan elemen <div id="injection-point">...</div>
+    .on('#injection-point', new ContentInjector(dynamicData))
+    // Terapkan transformasi pada stream respons dari a.html
+    .transform(assetResponse);
+});
+
+// Rute API sebagai contoh lain
+app.get('/api/status', (c) => {
+  return c.json({ status: 'ok' });
+});
+
+// Fallback: Untuk permintaan lain yang tidak cocok (misalnya, /favicon.ico), 
+// biarkan handler aset statis default yang menanganinya.
+app.notFound((c) => {
+  return c.env.ASSETS.fetch(c.req.raw);
 });
 
 export default app;
