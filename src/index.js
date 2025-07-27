@@ -1,7 +1,7 @@
-// File: src/index.js (FINAL, FINAL VERSION)
+// File: src/index.js (FINAL v4+)
 
 import { Hono } from 'hono'
-import { NotFoundError } from 'hono/utils/http-exception'
+import { HTTPException } from 'hono/http-exception'
 
 // Durable Object Class (tidak ada perubahan sama sekali)
 export class TokenLocker {
@@ -21,11 +21,12 @@ export class TokenLocker {
 
 const app = new Hono()
 
-// Middleware untuk menangani error dengan rapi
+// Middleware untuk menangani error
 app.onError((err, c) => {
     console.error('Unhandled exception:', err);
-    if (err instanceof NotFoundError) {
-        // Jika Hono tidak menemukan route, biarkan Cloudflare mencoba mencari file statis.
+    // Cek apakah error adalah instance dari HTTPException dan statusnya 404
+    if (err instanceof HTTPException && err.status === 404) {
+        // Jika Hono tidak menemukan route, biarkan Cloudflare mencari file statis.
         // Ini adalah fallback ke sistem [site].
         return c.env.ASSETS.fetch(c.req.raw);
     }
@@ -39,16 +40,15 @@ app.get('/:token', async (c) => {
   // Regex untuk membedakan token dari nama file statis
   const isStaticFileRequest = /\.(css|js|ico|png|jpg|svg)$/.test(token);
   if (isStaticFileRequest) {
-    // Jika ini request file statis, lempar NotFoundError agar onError bisa menanganinya
-    throw new NotFoundError();
+    // Jika ini request file statis, biarkan fallback yang menanganinya
+    return c.notFound();
   }
 
   // Cek & Ambil Kredensial dari KV
   const credentials = await c.env.TOKEN_DB.get(token, { type: 'json' });
   if (!credentials) {
-    // Jika token tidak ada di KV, mungkin ini juga request file statis (seperti C.html)
-    // atau memang token tidak valid. Kita biarkan fallback yang menanganinya.
-    throw new NotFoundError();
+    // Jika token tidak ada di KV, ini juga 404.
+    return c.notFound();
   }
 
   // Panggil Durable Object untuk mengunci token
@@ -73,6 +73,9 @@ app.get('/:token', async (c) => {
   
   return c.html(html);
 })
+
+// Hono secara otomatis akan menangani request yang tidak cocok dengan route di atas
+// dan melempar 404, yang akan ditangkap oleh app.onError kita.
 
 // Export
 export default {
