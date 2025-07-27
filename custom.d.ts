@@ -2,7 +2,7 @@
 
 // Sebelumnya: declare module '*.html'
 // Menjadi:
-declare module '*.html?raw' {
+declare module '*.html' {
   const content: string;
   export default content;
 }

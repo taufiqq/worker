@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
 // Impor konten file HTML sebagai string
-import indexPage from './static/index.html?raw'
+import indexPage from './static/index.html'
 
 const app = new Hono()
 
