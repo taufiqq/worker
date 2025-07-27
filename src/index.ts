@@ -1,26 +1,34 @@
 // src/index.ts
 
 import { Hono } from 'hono'
+import { logger } from 'hono/logger'
+
+// Impor konten file HTML sebagai string
+import indexPage from './static/index.html'
 
 const app = new Hono()
 
-// 1. Rute utama
+// Gunakan middleware logger untuk melihat log di terminal saat development
+app.use('*', logger())
+
+// 1. Rute utama sekarang menyajikan file HTML
 app.get('/', (c) => {
-  return c.text('Selamat Datang di Web Hono Sederhana!')
+  // Gunakan c.html() untuk mengirim respons dengan Content-Type: text/html
+  return c.html(indexPage) 
 })
 
-// 2. Rute dengan respons JSON (seperti API)
+// 2. Rute API tetap sama
 app.get('/api/posts', (c) => {
   const posts = [
     { id: 1, title: 'Belajar Hono' },
     { id: 2, title: 'Deploy ke Cloudflare' },
   ]
-  return c.json(posts) // Mengembalikan data dalam format JSON
+  return c.json(posts)
 })
 
-// 3. Rute dinamis dengan parameter
+// 3. Rute dinamis tetap sama
 app.get('/user/:name', (c) => {
-  const name = c.req.param('name') // Mengambil parameter 'name' dari URL
+  const name = c.req.param('name')
   return c.text(`Halo, ${name}! Terima kasih sudah berkunjung.`)
 })
 
