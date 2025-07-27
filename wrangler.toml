@@ -20,4 +20,4 @@ bindings = [
 # tapi untuk pembuatan awal, ini sudah cukup.
 [[migrations]]
 tag = "v1" # Versi migrasi Anda
-new_classes = ["TokenLocker"] # Daftar class baru yang dideploy di versi ini
+new_sqlite_classes = ["TokenLocker"] # Daftar class baru yang dideploy di versi ini
