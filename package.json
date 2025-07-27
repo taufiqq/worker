@@ -1,0 +1,16 @@
+{
+  "name": "hono-durable-game-token",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev"
+  },
+  "dependencies": {
+    "hono": "4.8.2",
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0",
+    "hono": "^4.2.7"
+  }
+}
