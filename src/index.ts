@@ -3,8 +3,8 @@ import { serveStatic } from 'hono/cloudflare-workers'
 
 const app = new Hono()
 
-// Middleware untuk serve file statis
-app.use('*', serveStatic({ root: './public' }))
+// Serve file statis dari bucket (public)
+app.use('*', serveStatic())
 
 app.get('/api/hello', (c) => c.text('Hello from API'))
 
