@@ -1,6 +1,6 @@
 # File: wrangler.toml
 
-name = "token-locker-worker"
+name = "m"
 main = "src/index.js"
 compatibility_date = "2023-12-01"
 
@@ -21,3 +21,7 @@ bindings = [
 [[migrations]]
 tag = "v1" # Versi migrasi Anda
 new_sqlite_classes = ["TokenLocker"] # Daftar class baru yang dideploy di versi ini
+
+[[kv_namespaces]]
+binding = "TOKEN_INDEX"
+id = "c8d3806fbe924bfbb68ec69779cccdbb" # Ganti dengan ID namespace Anda

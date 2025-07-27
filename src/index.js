@@ -1,81 +1,189 @@
-// File: src/index.js
+// File: src/index.js (VERSI BARU DENGAN INTEGRASI ADMIN)
 
-/**
- * -----------------------------------------------------------------------------
- *  Bagian 1: Durable Object Class - Otak dari Operasi
- *  Class 'TokenLocker' akan menangani logika untuk satu token spesifik.
- *  Setiap token akan memiliki instance 'TokenLocker'-nya sendiri.
- * -----------------------------------------------------------------------------
- */
+// =================================================================
+//  BAGIAN 1: DURABLE OBJECT CLASS - 'TokenLocker'
+//  Sekarang menyimpan lebih banyak data: user, pass, dan IP pemegang.
+// =================================================================
+
 export class TokenLocker {
   constructor(state, env) {
-    // 'state' adalah storage khusus untuk instance Durable Object ini.
-    // Ini didukung oleh SQLite di belakang layar dan sangat konsisten.
     this.state = state;
   }
 
-  // Metode 'fetch' akan dieksekusi setiap kali ada request ke instance Object ini.
+  // Metode fetch sekarang lebih pintar
   async fetch(request) {
-    // Ambil alamat IP klien dari header request.
+    const url = new URL(request.url);
     const ipAddress = request.headers.get('CF-Connecting-IP');
 
-    // Coba baca siapa pemegang token dari storage.
-    // 'storage.get()' bersifat atomik dan konsisten.
-    const holderIp = await this.state.storage.get('holderIp');
+    // Cek apakah ini request dari admin atau user biasa
+    if (url.pathname.endsWith('/admin')) {
+      return this.handleAdminRequest(request);
+    } else {
+      return this.handleUserClaim(request, ipAddress);
+    }
+  }
+  
+  // Logika untuk user biasa yang mengklaim token
+  async handleUserClaim(request, ipAddress) {
+    // Baca semua data yang tersimpan di loker ini
+    const data = await this.state.storage.get(['holderIp', 'mqttUser', 'mqttPass']);
 
-    if (holderIp) {
-      // KASUS 1: Token sudah ada yang memiliki.
-      if (holderIp === ipAddress) {
-        // Pemilik yang sama mencoba akses lagi. Beri izin.
-        return new Response(`Akses diberikan kembali untuk IP: ${ipAddress}`, { status: 200 });
+    if (!data.get('mqttUser')) {
+        return new Response("Token tidak valid atau telah dihapus.", { status: 404 });
+    }
+
+    if (data.has('holderIp')) {
+      // Sudah ada yang pegang
+      if (data.get('holderIp') === ipAddress) {
+        // Pemilik yang sama, berikan lagi kredensialnya
+        return new Response(JSON.stringify({
+            message: "Akses diberikan kembali.",
+            mqttUser: data.get('mqttUser'),
+            mqttPass: data.get('mqttPass')
+        }), { headers: { 'Content-Type': 'application/json' } });
       } else {
-        // Orang lain dengan IP berbeda mencoba merebut. Tolak!
-        return new Response(`Akses ditolak. Token ini sudah dikunci oleh IP lain.`, { status: 403 });
+        return new Response("Token ini sudah digunakan oleh IP lain.", { status: 403 });
       }
     } else {
-      // KASUS 2: Token belum ada pemiliknya. Inilah pemenangnya!
-      
-      // Simpan alamat IP pemenang ke storage.
-      // Operasi 'put()' ini juga atomik. Request berikutnya yang masuk
-      // akan melihat nilai ini.
+      // Belum ada yang pegang, ini pemenangnya!
       await this.state.storage.put('holderIp', ipAddress);
+      
+      return new Response(JSON.stringify({
+        message: "Selamat, Anda mendapatkan akses!",
+        mqttUser: data.get('mqttUser'),
+        mqttPass: data.get('mqttPass')
+      }), { headers: { 'Content-Type': 'application/json' } });
+    }
+  }
 
-      // Beri pesan sukses. Di sini Anda bisa menyajikan halaman game (C.html).
-      return new Response(`Selamat! Token berhasil dikunci oleh IP: ${ipAddress}.`, { status: 200 });
+  // Logika untuk request dari admin (setup, delete, get info)
+  async handleAdminRequest(request) {
+    switch (request.method) {
+      case 'POST': // Setup atau update token
+        const { mqttUser, mqttPass } = await request.json();
+        await this.state.storage.put({ mqttUser, mqttPass });
+        return new Response("Token data set.", { status: 200 });
+      
+      case 'DELETE': // Hapus semua data di loker ini
+        await this.state.storage.deleteAll();
+        return new Response("Token data deleted.", { status: 200 });
+
+      case 'GET': // Dapatkan info detail loker ini (user, pass, ip)
+        const allData = await this.state.storage.list();
+        return new Response(JSON.stringify(Object.fromEntries(allData)), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+      default:
+        return new Response("Method not allowed for admin.", { status: 405 });
     }
   }
 }
 
 
-/**
- * -----------------------------------------------------------------------------
- *  Bagian 2: Worker Utama - Penjaga Gerbang
- *  Worker ini adalah titik masuk utama. Tugasnya hanya satu:
- *  Menerima request, mengekstrak nama token, dan meneruskannya ke
- *  Durable Object yang tepat.
- * -----------------------------------------------------------------------------
- */
+// =================================================================
+//  BAGIAN 2: WORKER UTAMA - Router & Koordinator
+// =================================================================
+
 export default {
-  async fetch(request, env, ctx) {
-    // Ekstrak path dari URL, misal: '/my-secret-token'
+  async fetch(request, env) {
     const url = new URL(request.url);
-    const path = url.pathname.slice(1); // Hapus '/' di awal
+    const pathSegments = url.pathname.slice(1).split('/');
 
-    if (!path) {
-      return new Response("Silakan akses menggunakan sebuah token, contoh: /token123", { status: 400 });
+    // Router sederhana berdasarkan path
+    // -> /admin/list_tokens
+    // -> /admin/create_token
+    // -> /admin/delete_token/nama_token
+    // -> /nama_token_rahasia (untuk user)
+    if (pathSegments[0] === 'admin') {
+      return handleAdminRoutes(request, env);
+    } else {
+      return handleUserRoutes(request, env);
     }
-
-    // Buat ID untuk Durable Object.
-    // Kita gunakan nama token sebagai ID, agar semua request ke '/token123'
-    // selalu menuju ke instance Object yang sama.
-    // 'idFromName' memastikan string yang sama akan menghasilkan ID yang sama.
-    const id = env.TOKEN_LOCKER.idFromName(path);
-
-    // Dapatkan "stub" atau referensi ke instance Durable Object yang spesifik.
-    const obj = env.TOKEN_LOCKER.get(id);
-
-    // Teruskan request dari pengguna ke Durable Object.
-    // Worker akan menunggu respons dari Object dan mengirimkannya kembali ke pengguna.
-    return obj.fetch(request);
   },
 };
+
+// --- Fungsi Helper untuk Rute Admin ---
+async function handleAdminRoutes(request, env) {
+  // TODO: Tambahkan Basic Auth di sini jika diperlukan
+  const url = new URL(request.url);
+  const path = url.pathname;
+  
+  if (path === '/admin/list_tokens') {
+    const list = await env.TOKEN_INDEX.list();
+    // Kita hanya mengembalikan nama-nama tokennya
+    return new Response(JSON.stringify(list.keys), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (path === '/admin/create_token' && request.method === 'POST') {
+    const { mqttUser, mqttPass } = await request.json();
+    if (!mqttUser || !mqttPass) {
+        return new Response("mqttUser dan mqttPass dibutuhkan", { status: 400 });
+    }
+
+    const tokenName = generateSecureToken(16);
+    
+    // 1. Tambahkan ke indeks KV
+    await env.TOKEN_INDEX.put(tokenName, "active");
+    
+    // 2. Kirim detail ke Durable Object untuk disimpan
+    const id = env.TOKEN_LOCKER.idFromName(tokenName);
+    const obj = env.TOKEN_LOCKER.get(id);
+    // Kita buat sub-path '/admin' agar DO tahu ini request admin
+    const adminUrl = new URL(request.url);
+    adminUrl.pathname = `/${tokenName}/admin`;
+    
+    await obj.fetch(adminUrl.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mqttUser, mqttPass })
+    });
+    
+    return new Response(JSON.stringify({ token: tokenName }), { status: 201 });
+  }
+
+  if (path.startsWith('/admin/delete_token/')) {
+    const tokenName = path.split('/')[3];
+    if (!tokenName) return new Response("Nama token dibutuhkan", { status: 400 });
+
+    // 1. Hapus dari indeks KV
+    await env.TOKEN_INDEX.delete(tokenName);
+
+    // 2. Kirim perintah delete ke Durable Object
+    const id = env.TOKEN_LOCKER.idFromName(tokenName);
+    const obj = env.TOKEN_LOCKER.get(id);
+    const adminUrl = new URL(request.url);
+    adminUrl.pathname = `/${tokenName}/admin`;
+    
+    await obj.fetch(adminUrl.toString(), { method: 'DELETE' });
+
+    return new Response(`Token ${tokenName} deleted.`, { status: 200 });
+  }
+  
+  return new Response("Admin route not found", { status: 404 });
+}
+
+// --- Fungsi Helper untuk Rute User ---
+async function handleUserRoutes(request, env) {
+  const url = new URL(request.url);
+  const tokenName = url.pathname.slice(1);
+
+  // Cek dulu apakah token ada di indeks kita
+  const tokenExists = await env.TOKEN_INDEX.get(tokenName);
+  if (!tokenExists) {
+    return new Response("Token tidak ditemukan atau tidak valid.", { status: 404 });
+  }
+
+  // Jika ada, teruskan ke Durable Object
+  const id = env.TOKEN_LOCKER.idFromName(tokenName);
+  const obj = env.TOKEN_LOCKER.get(id);
+  return obj.fetch(request);
+}
+
+function generateSecureToken(length = 16) {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
