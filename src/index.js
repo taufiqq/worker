@@ -2,14 +2,10 @@
 
 import { Hono } from 'hono';
 
-// Inisialisasi aplikasi Hono dengan akses ke 'Bindings' (env)
-// Ini memungkinkan kita untuk mengakses 'ASSETS' di dalam handler.
 const app = new Hono();
 
-// 1. Definisikan rute API Anda menggunakan Hono
-// Hono akan menangani permintaan yang cocok dengan pola ini.
+// Handler untuk rute API tetap sama
 app.get('/api/*', (c) => {
-  console.log('API route matched');
   return c.json({
     name: 'Cloudflare',
     framework: 'Hono',
@@ -17,17 +13,60 @@ app.get('/api/*', (c) => {
   });
 });
 
-// 2. Gunakan app.notFound untuk menangani semua permintaan yang TIDAK cocok
-// Ini adalah cara yang bersih untuk mengintegrasikan env.ASSETS.fetch
-// Jika Hono tidak menemukan rute yang cocok (misalnya, untuk '/', '/style.css', dll.),
-// ia akan menjalankan handler ini.
-app.notFound((c) => {
-  console.log(`Asset request: ${c.req.url}. Passing to env.ASSETS.fetch...`);
-  // c.env.ASSETS berasal dari binding di wrangler.toml
-  // c.req.raw adalah objek Request asli yang dibutuhkan oleh fetch()
-  return c.env.ASSETS.fetch(c.req.raw);
+/**
+ * Definisikan handler untuk HTMLRewriter.
+ * Kelas ini akan menambahkan sebuah elemen ke akhir <body>.
+ */
+class ElementInjector {
+  // Metode `element` akan dipanggil untuk setiap elemen yang cocok dengan selector.
+  element(element) {
+    const visitorIp = element.getAttribute('data-visitor-ip'); // Mengambil atribut dari element target
+    const injectedHtml = `
+      <div style="background-color: #f0f8ff; border: 1px solid #b0c4de; padding: 15px; margin-top: 20px; border-radius: 5px;">
+        <h2>✨ Content Injected by Cloudflare Worker!</h2>
+        <p>This section was added dynamically using HTMLRewriter.</p>
+        <p>Your IP address is: <strong>${visitorIp}</strong></p>
+      </div>
+    `;
+    
+    // Menyisipkan HTML di akhir elemen body
+    element.append(injectedHtml, { html: true });
+  }
+}
+
+// Handler notFound sekarang menjadi async karena kita perlu 'await' fetch
+app.notFound(async (c) => {
+  // 1. Ambil aset statis seperti biasa
+  const assetResponse = await c.env.ASSETS.fetch(c.req.raw);
+
+  // 2. Periksa apakah itu file HTML. Kita hanya ingin memodifikasi HTML.
+  const contentType = assetResponse.headers.get('Content-Type');
+  if (contentType && contentType.toLowerCase().includes('text/html')) {
+    
+    // 3. Jika itu HTML, buat instance HTMLRewriter
+    const rewriter = new HTMLRewriter();
+
+    // Dapatkan IP pengunjung dari header
+    const visitorIp = c.req.header('CF-Connecting-IP') || 'Not available';
+
+    // 4. Ubah respons dengan menambahkan handler kita
+    //    - '.on('body', ...)' menargetkan elemen <body>
+    //    - 'new ElementInjector()' adalah handler yang akan melakukan perubahan
+    //    - '.transform(assetResponse)' menerapkan transformasi ke stream respons
+    return rewriter
+      .on('body', {
+        element: (el) => {
+            // Kita bisa menambahkan data dinamis sebagai atribut
+            // sebelum handler kita dieksekusi.
+            el.setAttribute('data-visitor-ip', visitorIp);
+        }
+      })
+      .on('body', new ElementInjector())
+      .transform(assetResponse);
+  }
+
+  // 5. Jika bukan HTML (misalnya CSS, JS, gambar), kembalikan aset apa adanya.
+  return assetResponse;
 });
 
-// 3. Ekspor aplikasi Hono sebagai default export.
-// Cloudflare Worker akan secara otomatis meneruskan 'request' dan 'env' ke dalamnya.
 export default app;
