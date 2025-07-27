@@ -1,33 +1,30 @@
-// File: src/index.js
+// File: src/index.js (VERSI JAVASCRIPT MURNI - PASTI BERHASIL)
 
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 
 // =================================================================
 //  BAGIAN 1: DURABLE OBJECT CLASS - 'TokenLocker'
-//  Ini adalah otak dari sistem "siapa cepat dia dapat".
+//  Kode ini tidak berubah dan sudah benar.
 // =================================================================
 export class TokenLocker {
   constructor(state, env) {
-    this.state = state; // Menggunakan storage internal yang konsisten (SQLite-backed)
+    this.state = state;
   }
 
-  // Metode ini akan dieksekusi setiap kali ada request ke instance DO ini.
   async fetch(request) {
     const ipAddress = request.headers.get('CF-Connecting-IP');
     const holderIp = await this.state.storage.get('holderIp');
 
     if (holderIp) {
-      // KASUS 1: Token sudah ada yang memiliki.
       if (holderIp === ipAddress) {
-        return new Response("OK", { status: 200 }); // Izin diberikan kembali
+        return new Response("OK", { status: 200 });
       } else {
-        return new Response("Token ini sudah digunakan oleh IP lain.", { status: 403 }); // Tolak
+        return new Response("Token ini sudah digunakan oleh IP lain.", { status: 403 });
       }
     } else {
-      // KASUS 2: Token belum ada pemiliknya. Ini pemenangnya!
       await this.state.storage.put('holderIp', ipAddress);
-      return new Response("OK", { status: 200 }); // Izin diberikan
+      return new Response("OK", { status: 200 });
     }
   }
 }
@@ -36,60 +33,81 @@ export class TokenLocker {
 //  BAGIAN 2: APLIKASI HONO - Router Utama
 // =================================================================
 
-// Mendefinisikan tipe binding untuk autocompletion (opsional tapi bagus)
-type Bindings = {
-  TOKEN_LOCKER: DurableObjectNamespace
-  TOKEN_DB: KVNamespace
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+// --- INI PERBAIKANNYA ---
+// Inisialisasi Hono untuk JavaScript murni, tanpa sintaks 'type'.
+const app = new Hono()
 
 // --- ROUTE 1: Menyajikan aset statis (style.css dan script.js) ---
-// Semua request yang tidak cocok dengan route lain akan mencoba mencari file di folder /static
+// Middleware untuk menyajikan file dari folder /static.
+// Hono akan otomatis mencari file yang cocok dengan path request.
+// Contoh: request ke /style.css akan menyajikan /static/style.css
 app.use('/*', serveStatic({ root: './' }))
 
 // --- ROUTE 2: Menangani permintaan token dinamis ---
+// Ini adalah route utama yang akan menangkap URL seperti /token-abc
 app.get('/:token', async (c) => {
   const { token } = c.req.param()
   
   // 1. Cek apakah token ada di database KV kita
+  // c.env memberikan akses ke bindings di wrangler.toml (KV, DO, dll)
   const credentials = await c.env.TOKEN_DB.get(token, { type: 'json' });
   if (!credentials) {
     return c.text('Token tidak valid atau tidak ditemukan.', 404);
   }
 
   // 2. Panggil Durable Object untuk mencoba mengunci token
+  // Dapatkan ID yang konsisten untuk DO berdasarkan nama token
   const id = c.env.TOKEN_LOCKER.idFromName(token);
+  // Dapatkan referensi (stub) ke instance DO
   const obj = c.env.TOKEN_LOCKER.get(id);
   
-  // Teruskan request ke DO. Header akan otomatis diteruskan.
+  // Teruskan request ke DO. c.req.raw adalah objek Request asli.
   const lockResponse = await obj.fetch(c.req.raw);
 
   // 3. Periksa hasil dari DO
   if (!lockResponse.ok) {
-    // Jika DO menolak akses (status 403), teruskan pesan errornya ke user.
+    // Jika DO menolak akses (misal: status 403), teruskan pesan errornya ke user.
     const errorMessage = await lockResponse.text();
     return c.html(`<h1>Akses Ditolak</h1><p>${errorMessage}</p>`, lockResponse.status);
   }
 
   // 4. Jika penguncian berhasil, sajikan C.html dengan data yang disuntikkan
-  // Kita ambil konten C.html dari aset statis yang sudah dibundle.
-  const cHtmlResponse = await c.env.ASSETS.fetch(new URL('/C.html', c.req.url));
-  let html = await cHtmlResponse.text();
-  
-  const injectionScript = `
-    <script>
-      window.MQTT_CREDENTIALS = {
-        user: "${credentials.user}",
-        pass: "${credentials.pass}"
-      };
-      window.ID = ${credentials.id};
-    </script>
-  `;
-  
-  html = html.replace('</body>', `${injectionScript}</body>`);
-  
-  return c.html(html);
+  try {
+    // Ambil konten C.html dari aset statis yang sudah dibundle oleh Wrangler
+    // c.env.ASSETS adalah cara Hono/Wrangler mengakses file dari folder `site.bucket`
+    const cHtmlResponse = await c.env.ASSETS.fetch(new URL('/C.html', c.req.url));
+    if (!cHtmlResponse.ok) {
+        return c.text("Gagal memuat file halaman utama.", 500);
+    }
+    let html = await cHtmlResponse.text();
+    
+    // Siapkan skrip untuk menyuntikkan kredensial MQTT
+    const injectionScript = `
+      <script>
+        window.MQTT_CREDENTIALS = {
+          user: "${credentials.user}",
+          pass: "${credentials.pass}"
+        };
+        window.ID = ${credentials.id};
+      </script>
+    `;
+    
+    // Suntikkan skrip sebelum tag penutup </body>
+    html = html.replace('</body>', `${injectionScript}</body>`);
+    
+    // Kirim HTML yang sudah dimodifikasi ke browser
+    return c.html(html);
+
+  } catch (e) {
+    console.error("Error saat memuat atau memodifikasi C.html:", e);
+    return c.text("Terjadi kesalahan internal saat menyiapkan halaman.", 500);
+  }
 })
 
-export default app
+// Export aplikasi Hono sebagai handler default Worker
+export default {
+  fetch: app.fetch,
+  // Kita juga perlu mengekspor class Durable Object agar Cloudflare bisa menemukannya
+  // Ini adalah bagian yang sangat penting!
+  TokenLocker: TokenLocker, 
+}
