@@ -1,7 +1,7 @@
 # File: wrangler.toml
 
 name = "m"
-main = "src/index.ts"
+main = "worker.js"
 compatibility_date = "2023-12-01"
 
 
