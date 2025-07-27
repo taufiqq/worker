@@ -1,5 +1,8 @@
 // custom.d.ts
-declare module '*.html' {
+
+// Sebelumnya: declare module '*.html'
+// Menjadi:
+declare module '*.html?raw' {
   const content: string;
   export default content;
 }

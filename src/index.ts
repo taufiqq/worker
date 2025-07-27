@@ -4,16 +4,13 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
 // Impor konten file HTML sebagai string
-import indexPage from './static/index.html'
+import indexPage from './static/index.html?raw'
 
 const app = new Hono()
 
-// Gunakan middleware logger untuk melihat log di terminal saat development
 app.use('*', logger())
 
-// 1. Rute utama sekarang menyajikan file HTML
 app.get('/', (c) => {
-  // Gunakan c.html() untuk mengirim respons dengan Content-Type: text/html
   return c.html(indexPage) 
 })
 
