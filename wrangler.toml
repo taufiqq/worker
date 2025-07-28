@@ -15,4 +15,4 @@ class_name = "ClaimLockDO"
 
 [[migrations]]
 tag = "your-unique-migration-tag"
-new_sqlite_classes = ["ClainLockDO"]
+new_sqlite_classes = ["ClaimLockDO"]
