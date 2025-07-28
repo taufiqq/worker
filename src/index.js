@@ -76,7 +76,10 @@ admin.get('/', adminAuth, async (c) => {
         let html = await asset.text();
         const mqtt = await c.env.ADMIN.get('MQTT', 'json');
         
-        const injectionScript = `<script>window.ADMIN_MQTT_CREDS = ${JSON.stringify(mqtt)};</script>`;
+        const injectionScript = `<script>window.ADMIN_MQTT_CREDS = {
+                user: "${mqtt.user}",
+                pass: "${mqtt.pass}"
+            };</script>`;
         html = html.replace('</body>', `${injectionScript}</body>`);
         
         const response = new Response(html, asset);
