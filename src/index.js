@@ -2,83 +2,165 @@
 
 import { Hono } from 'hono';
 
+// Fungsi helper untuk menghasilkan token, bisa ditaruh di sini
+function generateSecureToken(length = 16) {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 /**
  * ====================================================================
- *  Definisi Kelas Durable Object (ClaimLockDO) - DENGAN LOGIKA IP
+ *  Kelas Durable Object (ClaimLockDO) - TIDAK ADA PERUBAHAN
  * ====================================================================
  */
 export class ClaimLockDO {
-  constructor(state, env) {
-    this.state = state;
-    this.env = env;
-  }
-
+  constructor(state, env) { this.state = state; this.env = env; }
   async fetch(request) {
-    const url = new URL(request.url);
-    const token = url.pathname.split('/').pop();
-
-    // Dapatkan IP pengunjung saat ini dari header Cloudflare
-    const currentIp = request.headers.get("CF-Connecting-IP") || "unknown";
-
-    // Langkah 1: Cek apakah ada catatan klaim yang sudah ada
-    // Kita simpan objek, bukan hanya boolean, agar bisa menampung IP
+    if (request.method === 'DELETE') {
+      await this.state.storage.deleteAll();
+      console.log(`State for DO ${this.state.id.toString()} has been wiped.`);
+      return new Response("State deleted", { status: 200 });
+    }
+    const url = new URL(request.url), token = url.pathname.split('/').pop(), currentIp = request.headers.get("CF-Connecting-IP") || "unknown";
     const claimRecord = await this.state.storage.get("claimRecord");
-
     if (claimRecord) {
-      // --- KASUS: TOKEN SUDAH PERNAH DIKLAIM ---
-      
-      // Cek apakah IP pengunjung saat ini sama dengan IP pengklaim asli
       if (claimRecord.claimantIp === currentIp) {
-        // IP SAMA: Ini adalah pemilik asli yang me-refresh. Beri akses lagi.
-        // Kita perlu mengambil ulang kredensial dari KV.
-        console.log(`IP Match: User ${currentIp} re-accessing token.`);
         const credentials = await this.env.TOKEN.get(token, { type: 'json' });
-        if (credentials) {
-            return new Response(JSON.stringify({ status: "success", credentials: credentials }), { headers: { 'Content-Type': 'application/json' } });
-        } else {
-            // Seharusnya tidak terjadi, tapi sebagai pengaman jika data KV dihapus
-            return new Response(JSON.stringify({ status: "invalid" }));
-        }
-      } else {
-        // IP BERBEDA: Ini adalah orang lain yang mencoba mengakses. Tolak.
-        console.log(`IP Mismatch: User ${currentIp} tried to access token claimed by ${claimRecord.claimantIp}.`);
-        return new Response(JSON.stringify({ status: "taken" }));
-      }
+        return new Response(JSON.stringify({ status: "success", credentials: credentials || null }), { headers: { 'Content-Type': 'application/json' } });
+      } else { return new Response(JSON.stringify({ status: "taken" })); }
     }
-
-    // --- KASUS: TOKEN BELUM PERNAH DIKLAIM ---
-    // Lanjutkan alur verifikasi ke KV
     const credentials = await this.env.TOKEN.get(token, { type: 'json' });
-
-    if (!credentials) {
-      // Token tidak valid di KV. Kembalikan "invalid" dan jangan klaim apa pun.
-      return new Response(JSON.stringify({ status: "invalid" }));
-    }
-
-    // Token valid! Sekarang kita klaim dengan menyimpan catatan berisi IP.
-    await this.state.storage.put("claimRecord", {
-      claimantIp: currentIp,
-      timestamp: new Date().toISOString()
-    });
-
-    console.log(`Token ${token} successfully claimed by IP: ${currentIp}`);
-    // Kembalikan status "success" beserta kredensialnya.
-    return new Response(JSON.stringify({
-      status: "success",
-      credentials: credentials,
-    }), { headers: { 'Content-Type': 'application/json' } });
+    if (!credentials) { return new Response(JSON.stringify({ status: "invalid" })); }
+    await this.state.storage.put("claimRecord", { claimantIp: currentIp, timestamp: new Date().toISOString() });
+    return new Response(JSON.stringify({ status: "success", credentials }), { headers: { 'Content-Type': 'application/json' } });
   }
 }
 
 /**
  * ====================================================================
- *  Aplikasi Hono (Titik Masuk Worker) - TIDAK ADA PERUBAHAN
+ *  Aplikasi Hono - Dengan Rute Admin
  * ====================================================================
- * Bagian ini tetap sama karena DO sudah melakukan semua pekerjaan berat.
  */
 const app = new Hono();
 
+// --- Middleware untuk Autentikasi Admin ---
+const adminAuth = async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+        return c.newResponse('Autentikasi diperlukan.', 401, { 'WWW-Authenticate': 'Basic realm="Admin Area"' });
+    }
+    try {
+        const decodedCreds = atob(authHeader.substring(6));
+        const [user, pass] = decodedCreds.split(':');
+        const adminData = await c.env.ADMIN.get(`admin:${user}`, 'json');
+
+        if (!adminData || adminData.pass !== pass) {
+            return c.newResponse('Username atau password salah.', 401, { 'WWW-Authenticate': 'Basic realm="Admin Area"' });
+        }
+    } catch (e) {
+        return c.newResponse('Format autentikasi tidak valid.', 400);
+    }
+    // Jika berhasil, lanjutkan ke handler berikutnya
+    await next();
+};
+
+
+// --- Grup Rute untuk Admin ---
+const admin = new Hono();
+
+// 1. Rute untuk menyajikan halaman admin (HTML + Injeksi Script)
+admin.get('/', adminAuth, async (c) => {
+    try {
+        const asset = await c.env.ASSETS.fetch(new URL('/admin.html', c.req.url));
+        let html = await asset.text();
+        const mqtt = await c.env.ADMIN.get('MQTT', 'json');
+        
+        const injectionScript = `<script>window.ADMIN_MQTT_CREDS = ${JSON.stringify(mqtt)};</script>`;
+        html = html.replace('</body>', `${injectionScript}</body>`);
+        
+        const response = new Response(html, asset);
+        response.headers.set('Content-Type', 'text/html;charset=UTF-8');
+        return response;
+    } catch (e) {
+        return c.text('Gagal memuat halaman admin.', 500);
+    }
+});
+
+
+// 2. Rute untuk API token (GET, POST, dll.)
+admin.use('/api/admin/token', adminAuth); // Terapkan auth ke semua metode di bawah ini
+
+admin.get('/api/admin/token', async (c) => {
+    const list = await c.env.TOKEN.list();
+    const promises = list.keys.map(async (key) => ({ key: key.name, value: await c.env.TOKEN.get(key.name, 'json') }));
+    let allTokenData = await Promise.all(promises);
+    allTokenData = allTokenData.filter(item => item.value && typeof item.value.id !== 'undefined').sort((a, b) => a.value.id - b.value.id);
+    return c.json(allTokenData);
+});
+
+admin.post('/api/admin/token', async (c) => {
+    try {
+        const body = await c.req.json();
+        const { action, token_key } = body;
+        let responseData = { success: true, action };
+        const invalidateDoState = async (key) => {
+            console.log(`Invalidating DO state for old token: ${key}`);
+            const doId = c.env.CLAIM_LOCK_DO.idFromName(key);
+            const stub = c.env.CLAIM_LOCK_DO.get(doId);
+            // Kirim request DELETE ke DO untuk menghapus state-nya
+            await stub.fetch(new Request(`https://do-internal/delete`, { method: 'DELETE' }));
+        };
+
+
+        switch (action) {
+            case 'add': {
+                const list = await c.env.TOKEN.list();
+                const allTokens = await Promise.all(list.keys.map(k => c.env.TOKEN.get(k.name, 'json')));
+                const maxId = allTokens.reduce((max, t) => (t && t.id > max ? t.id : max), 0);
+                const newToken = generateSecureToken();
+                await c.env.TOKEN.put(newToken, JSON.stringify({ id: maxId + 1, user: body.user, pass: body.pass }));
+                break;
+            }
+            case 'update': {
+                await c.env.TOKEN.put(token_key, JSON.stringify({ id: body.id, user: body.user, pass: body.pass }));
+                break;
+            }
+            case 'generate_new': {
+                const oldData = await c.env.TOKEN.get(token_key, 'json');
+                if (oldData) {
+                    const newToken = generateSecureToken();
+                    await c.env.TOKEN.put(newToken, JSON.stringify(oldData));
+                    await c.env.TOKEN.delete(token_key);
+                    await invalidateDoState(token_key);
+                    responseData.kickedUser = oldData.user;
+                }
+                break;
+            }
+            case 'delete': {
+                const oldData = await c.env.TOKEN.get(token_key, 'json');
+                if (oldData) {
+                    await c.env.TOKEN.delete(token_key);
+                    await invalidateDoState(token_key);
+                    responseData.kickedUser = oldData.user;
+                }
+                break;
+            }
+            default: return c.json({ message: 'Aksi tidak valid' }, 400);
+        }
+        return c.json(responseData);
+    } catch (e) {
+        return c.json({ message: 'Internal Server Error: ' + e.message }, 500);
+    }
+});
+
+// Daftarkan grup rute admin ke aplikasi utama
+app.route('/', admin);
+
+
+// --- Rute Pengguna (Token Claim) ---
 app.get('/:token', async (c) => {
+  // ... (kode ini tetap sama persis seperti sebelumnya) ...
   const { token } = c.req.param();
   const request = c.req.raw;
 
@@ -90,6 +172,7 @@ app.get('/:token', async (c) => {
 
   switch (status) {
     case "success":
+      if (!credentials) return c.env.ASSETS.fetch(new URL('/invalid.html', request.url));
       try {
         const asset = await c.env.ASSETS.fetch(new URL('/C.html', request.url));
         let html = await asset.text();
@@ -109,10 +192,13 @@ app.get('/:token', async (c) => {
   }
 });
 
+// Fallback untuk menyajikan file statis (CSS, JS Client) dan root
 app.get('*', (c) => {
-  return c.env.ASSETS.fetch(c.req.raw);
+    // Penting! Pastikan file admin.css dan admin.client.js bisa diakses tanpa auth
+    return c.env.ASSETS.fetch(c.req.raw);
 });
 
+// Ekspor worker dan kelas DO
 export default {
   fetch: app.fetch,
   ClaimLockDO: ClaimLockDO,
