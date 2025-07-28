@@ -2,68 +2,88 @@
 
 import { Hono } from 'hono';
 
-const app = new Hono();
-
-// Definisikan handler untuk HTMLRewriter
-// Kelas ini akan menyuntikkan konten ke dalam elemen dengan id="injection-point"
-class ContentInjector {
-  constructor(dynamicData) {
-    this.data = dynamicData;
+/**
+ * ====================================================================
+ *  Definisi Kelas Durable Object (ClaimLockDO)
+ * ====================================================================
+ * Setiap instance DO ini mewakili satu 'uniqueId'.
+ * Ia hanya memiliki satu tugas: memeriksa dan mengklaim sebuah kunci.
+ */
+export class ClaimLockDO {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    // this.state.storage adalah penyimpanan Key-Value yang persisten
   }
 
-  element(element) {
-    const injectedHtml = `
-      <div class="injected">
-        <h2>✨ Konten Dinamis Berhasil Disuntikkan!</h2>
-        <p>Pesan ini dibuat secara on-the-fly oleh Worker.</p>
-        <p>Waktu Server: <strong>${this.data.timestamp}</strong></p>
-        <p>Lokasi Pengunjung (Colo): <strong>${this.data.colo}</strong></p>
-      </div>
-    `;
-    element.setInnerContent(injectedHtml, { html: true });
+  // fetch() adalah API untuk DO kita.
+  async fetch(request) {
+    // Cek apakah 'claimant' sudah ada di penyimpanan.
+    // 'this.state.storage.get()' adalah atomik untuk instance DO ini.
+    let claimant = await this.state.storage.get("claimant");
+
+    if (claimant) {
+      // Jika sudah ada, berarti ID ini sudah diklaim.
+      // Kita kembalikan status "taken".
+      console.log(`ID sudah diklaim oleh: ${claimant}`);
+      return new Response("taken");
+    } else {
+      // Jika belum ada, ini adalah kesempatan pertama!
+      // Ambil info siapa yang mencoba mengklaim (misal, dari IP).
+      const newClaimant = request.headers.get("CF-Connecting-IP") || "unknown";
+      
+      // Simpan claimant baru. Operasi ini mengunci ID ini.
+      await this.state.storage.put("claimant", newClaimant);
+      
+      console.log(`ID berhasil diklaim oleh: ${newClaimant}`);
+      // Kembalikan status "success".
+      return new Response("success");
+    }
   }
 }
 
-// Rute utama untuk menangani permintaan ke "/"
-app.get('/', async (c) => {
-  // 1. Buat URL absolut ke file a.html yang ada di dalam aset statis.
-  //    Penting: fetch() di dalam worker memerlukan URL lengkap atau objek Request.
-  const assetUrl = new URL(c.req.url);
-  assetUrl.pathname = '/a.html'; // Tunjuk ke file yang kita inginkan
+/**
+ * ====================================================================
+ *  Aplikasi Hono (Worker Entrypoint)
+ * ====================================================================
+ */
+const app = new Hono();
 
-  // 2. Ambil file a.html dari binding ASSETS
-  const assetResponse = await c.env.ASSETS.fetch(assetUrl.toString());
+// Rute utama yang menangani link unik, misalnya /abc, /xyz123
+// Parameter ':id' akan menangkap apapun setelah slash pertama.
+app.get('/:id', async (c) => {
+  const { id } = c.req.param();
 
-  // Pastikan file berhasil diambil sebelum melanjutkan
-  if (!assetResponse.ok) {
-    return c.text('Error: a.html tidak dapat ditemukan di aset.', 500);
+  // Validasi sederhana, jangan proses untuk file aset yang umum
+  if (id.includes('.')) {
+      return c.env.ASSETS.fetch(c.req.raw);
   }
 
-  // 3. Kumpulkan data dinamis yang ingin disuntikkan
-  const dynamicData = {
-    timestamp: new Date().toUTCString(),
-    colo: c.req.cf?.colo || 'N/A', // Ambil kode bandara dari Cloudflare
-  };
+  // Dapatkan ID Durable Object yang konsisten berdasarkan 'id' dari URL.
+  // Ini memastikan '/aaa' selalu pergi ke DO yang sama.
+  const doId = c.env.CLAIM_LOCK_DO.idFromName(id);
   
-  // 4. Buat instance HTMLRewriter dan terapkan transformasi
-  const rewriter = new HTMLRewriter();
-  
-  return rewriter
-    // Targetkan elemen <div id="injection-point">...</div>
-    .on('#injection-point', new ContentInjector(dynamicData))
-    // Terapkan transformasi pada stream respons dari a.html
-    .transform(assetResponse);
+  // Dapatkan stub untuk berkomunikasi dengan DO tersebut.
+  const stub = c.env.CLAIM_LOCK_DO.get(doId);
+
+  // Kirim permintaan ke DO dan tunggu responsnya.
+  const doResponse = await stub.fetch(c.req.raw);
+  const status = await doResponse.text(); // "success" atau "taken"
+
+  // Berdasarkan respons dari DO, sajikan halaman HTML yang sesuai.
+  if (status === 'success') {
+    return c.env.ASSETS.fetch(new URL('/success.html', c.req.url));
+  } else {
+    return c.env.ASSETS.fetch(new URL('/taken.html', c.req.url));
+  }
 });
 
-// Rute API sebagai contoh lain
-app.get('/api/status', (c) => {
-  return c.json({ status: 'ok' });
-});
-
-// Fallback: Untuk permintaan lain yang tidak cocok (misalnya, /favicon.ico), 
-// biarkan handler aset statis default yang menanganinya.
-app.notFound((c) => {
+// Fallback untuk root dan file aset lainnya
+app.get('*', (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  ClaimLockDO: ClaimLockDO, // Ekspor kelas DO agar Cloudflare bisa menemukannya
+};

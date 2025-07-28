@@ -9,7 +9,10 @@ compatibility_date = "2023-12-01"
 directory = "./public"
 binding = "ASSETS"
 
-
+[[durable_objects.bindings]]
+name = "CLAIM_LOCK_DO" # Nama yang akan kita gunakan di kode: c.env.CLAIM_LOCK_DO
+class_name = "ClaimLockDO"
 
 [[migrations]]
 tag = "your-unique-migration-tag"
+new_sqlite_classes = ["ClainLockDO"]
