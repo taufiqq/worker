@@ -75,11 +75,22 @@ admin.get('/', adminAuth, async (c) => {
         const asset = await c.env.ASSETS.fetch(new URL('/admin.html', c.req.url));
         let html = await asset.text();
         const mqtt = await c.env.ADMIN.get('MQTT', 'json');
+        const debugData = mqtt ? JSON.stringify(mqtt, null, 2) : "DATA TIDAK DITEMUKAN atau null";
         
-        const injectionScript = `<script>window.ADMIN_MQTT_CREDS = {
-                user: "${mqtt.user}",
-                pass: "${mqtt.pass}"
-            };</script>`;
+        const debugBlock = `
+          <div style="background-color: #fff3cd; border: 2px solid #f00; padding: 15px; margin: 15px; font-family: monospace; color: #333;">
+            <h2 style="color: #f00;">--- DEBUG INFO DARI SERVER ---</h2>
+            <p>Ini adalah data mentah yang berhasil diambil server dari KV Namespace 'ADMIN' dengan kunci 'MQTT':</p>
+            <pre style="background: #eee; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap;">${debugData}</pre>
+            <p>Bandingkan data di atas dengan yang diharapkan oleh kode klien (harus ada 'user' dan 'pass').</p>
+          </div>
+        `;
+        
+        // Suntikkan blok debug ini tepat setelah tag <body>
+        html = html.replace('<body>', `<body>${debugBlock}`);
+        // --- AKHIR BAGIAN DEBUG ---
+
+        const injectionScript = `<script>window.ADMIN_MQTT_CREDS${JSON.stringify(mqtt)};</script>`;
         html = html.replace('</body>', `${injectionScript}</body>`);
         
         const response = new Response(html, asset);
