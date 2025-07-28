@@ -14,5 +14,5 @@ name = "CLAIM_LOCK_DO" # Nama yang akan kita gunakan di kode: c.env.CLAIM_LOCK_D
 class_name = "ClaimLockDO"
 
 [[migrations]]
-tag = "your-unique-migration-tag"
+tag = "v1"
 new_sqlite_classes = ["ClaimLockDO"]
