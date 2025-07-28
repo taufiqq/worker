@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Manajemen Token (SPA)</title>
+    <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Panel Admin (SPA)</h1>
+
+        <div id="loading-indicator" class="loading" style="display: none;">Memuat data...</div>
+
+        <h2>Tambah Token Baru</h2>
+        <div class="add-form">
+            <form id="add-token-form">
+                <label for="add-user">User:</label>
+                <input type="text" id="add-user" name="user" required>
+                <label for="add-pass">Password:</label>
+                <input type="text" id="add-pass" name="pass" required>
+                <button type="submit" class="btn btn-add">Tambah Token</button>
+            </form>
+        </div>
+
+        <h2>Daftar Token</h2>
+        <table id="tokens-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Password</th>
+                    <th>Token</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data akan diisi oleh JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Tambahkan Paho MQTT Library di sini -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <script src="/admin.client.js"></script>
+</body>
+</html>
