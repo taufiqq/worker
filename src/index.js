@@ -72,7 +72,7 @@ const admin = new Hono();
 // 1. Rute untuk menyajikan halaman admin (HTML + Injeksi Script)
 admin.get('/', adminAuth, async (c) => {
     try {
-        const asset = await c.env.ASSETS.fetch(new URL('/admin.html', c.req.url));
+        const asset = await c.env.ASSETS.fetch(new URL('/adminn.html', c.req.url));
         let html = await asset.text();
         const mqtt = await c.env.ADMIN.get('MQTT', 'json');
         const debugData = mqtt ? JSON.stringify(mqtt, null, 2) : "DATA TIDAK DITEMUKAN atau null";
