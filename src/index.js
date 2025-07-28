@@ -6,37 +6,26 @@ import { Hono } from 'hono';
  * ====================================================================
  *  Definisi Kelas Durable Object (ClaimLockDO)
  * ====================================================================
- * Setiap instance DO ini mewakili satu 'uniqueId'.
- * Ia hanya memiliki satu tugas: memeriksa dan mengklaim sebuah kunci.
+ * Setiap instance DO ini mewakili satu token dan status klaimnya.
  */
 export class ClaimLockDO {
-  constructor(state, env) {
+  constructor(state) {
     this.state = state;
-    this.env = env;
-    // this.state.storage adalah penyimpanan Key-Value yang persisten
   }
 
-  // fetch() adalah API untuk DO kita.
-  async fetch(request) {
-    // Cek apakah 'claimant' sudah ada di penyimpanan.
-    // 'this.state.storage.get()' adalah atomik untuk instance DO ini.
-    let claimant = await this.state.storage.get("claimant");
+  // API untuk DO ini. Cukup periksa dan set status "claimed".
+  async fetch() {
+    // Periksa apakah token ini sudah pernah diklaim
+    const isClaimed = await this.state.storage.get("claimed");
 
-    if (claimant) {
-      // Jika sudah ada, berarti ID ini sudah diklaim.
-      // Kita kembalikan status "taken".
-      console.log(`ID sudah diklaim oleh: ${claimant}`);
+    if (isClaimed) {
+      // Jika ya, kembalikan status "taken"
       return new Response("taken");
     } else {
-      // Jika belum ada, ini adalah kesempatan pertama!
-      // Ambil info siapa yang mencoba mengklaim (misal, dari IP).
-      const newClaimant = request.headers.get("CF-Connecting-IP") || "unknown";
-      
-      // Simpan claimant baru. Operasi ini mengunci ID ini.
-      await this.state.storage.put("claimant", newClaimant);
-      
-      console.log(`ID berhasil diklaim oleh: ${newClaimant}`);
-      // Kembalikan status "success".
+      // Jika tidak, ini adalah klaim pertama.
+      // Set status menjadi 'true' dan simpan. Ini adalah operasi atomik.
+      await this.state.storage.put("claimed", true);
+      // Kembalikan status "success"
       return new Response("success");
     }
   }
@@ -44,46 +33,73 @@ export class ClaimLockDO {
 
 /**
  * ====================================================================
- *  Aplikasi Hono (Worker Entrypoint)
+ *  Aplikasi Hono (Titik Masuk Worker)
  * ====================================================================
  */
 const app = new Hono();
 
-// Rute utama yang menangani link unik, misalnya /abc, /xyz123
-// Parameter ':id' akan menangkap apapun setelah slash pertama.
-app.get('/:id', async (c) => {
-  const { id } = c.req.param();
+// Rute ini akan menangkap semua permintaan seperti /token123, /apapun, dll.
+app.get('/:token', async (c) => {
+  const { token } = c.req.param();
+  const request = c.req.raw;
 
-  // Validasi sederhana, jangan proses untuk file aset yang umum
-  if (id.includes('.')) {
-      return c.env.ASSETS.fetch(c.req.raw);
+  // --- Langkah 1: Cek Status Klaim dengan Durable Object ---
+  // Dapatkan ID DO yang unik dan konsisten berdasarkan nama token
+  const doId = c.env.CLAIM_LOCK_DO.idFromName(token);
+  const stub = c.env.CLAIM_LOCK_DO.get(doId);
+  
+  // Hubungi DO untuk mencoba mengklaim token ini
+  const doResponse = await stub.fetch(request);
+  const claimStatus = await doResponse.text(); // Akan berisi "success" atau "taken"
+
+  if (claimStatus === 'taken') {
+    // Jika token sudah diklaim, sajikan halaman 'taken.html' dan hentikan proses.
+    return c.env.ASSETS.fetch(new URL('/taken.html', request.url));
   }
 
-  // Dapatkan ID Durable Object yang konsisten berdasarkan 'id' dari URL.
-  // Ini memastikan '/aaa' selalu pergi ke DO yang sama.
-  const doId = c.env.CLAIM_LOCK_DO.idFromName(id);
-  
-  // Dapatkan stub untuk berkomunikasi dengan DO tersebut.
-  const stub = c.env.CLAIM_LOCK_DO.get(doId);
+  // --- Langkah 2: Jika Klaim Berhasil, Cek Kredensial di KV ---
+  // Kode ini hanya berjalan jika claimStatus adalah "success"
+  const credentials = await c.env.TOKEN.get(token, { type: 'json' });
 
-  // Kirim permintaan ke DO dan tunggu responsnya.
-  const doResponse = await stub.fetch(c.req.raw);
-  const status = await doResponse.text(); // "success" atau "taken"
+  if (!credentials) {
+    // Jika token tidak ada di KV, sajikan halaman 'invalid.html'
+    return c.env.ASSETS.fetch(new URL('/invalid.html', request.url));
+  }
 
-  // Berdasarkan respons dari DO, sajikan halaman HTML yang sesuai.
-  if (status === 'success') {
-    return c.env.ASSETS.fetch(new URL('/success.html', c.req.url));
-  } else {
-    return c.env.ASSETS.fetch(new URL('/taken.html', c.req.url));
+  // --- Langkah 3: Jika Kredensial Valid, Sajikan dan Suntikkan C.html ---
+  try {
+    const asset = await c.env.ASSETS.fetch(new URL('/C.html', request.url));
+    let html = await asset.text();
+
+    const injectionScript = `
+    <script>
+        window.MQTT_CREDENTIALS = ${JSON.stringify({ user: credentials.user, pass: credentials.pass })};
+        window.ID = ${JSON.stringify(credentials.id)};
+    </script>
+    `;
+
+    html = html.replace('</body>', `${injectionScript}</body>`);
+
+    const response = new Response(html, asset);
+    // Pastikan header Content-Type di-set dengan benar
+    response.headers.set('Content-Type', 'text/html;charset=UTF-8');
+    
+    return response;
+
+  } catch (e) {
+    return c.text('Gagal memuat halaman C.html.', 500);
   }
 });
 
-// Fallback untuk root dan file aset lainnya
+// Fallback untuk menyajikan file statis lainnya (seperti CSS/JS yang dipanggil dari C.html)
+// atau halaman root.
 app.get('*', (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
+
+// Ekspor worker dan kelas Durable Object
 export default {
   fetch: app.fetch,
-  ClaimLockDO: ClaimLockDO, // Ekspor kelas DO agar Cloudflare bisa menemukannya
+  ClaimLockDO: ClaimLockDO,
 };

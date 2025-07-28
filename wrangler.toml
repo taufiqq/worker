@@ -6,8 +6,13 @@ compatibility_date = "2023-12-01"
 
 
 [assets]
-directory = "./public"
+directory = "./static"
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "TOKEN"
+id = "e4b68d7dd477413fbe140f59259254c7" # Ganti dengan ID KV Anda
+
 
 [[durable_objects.bindings]]
 name = "CLAIM_LOCK_DO" # Nama yang akan kita gunakan di kode: c.env.CLAIM_LOCK_DO
