@@ -214,7 +214,7 @@ function mapValueToLevel(inputValue, levelsConfig) {
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
     
-    if (belok !== wheelState.belok && Date.now() - controlState.terakhirBelok < controlState.timerBelok) {
+    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) {
       publishMqtt(window.ID + '/belok', (92 - belok).toString());
       wheelState.belok = belok;
       controlState.terakhirBelok = Date.now();
@@ -229,7 +229,7 @@ function processWheelCommands(belok, gas) {
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
     
-    if(Date.now() - controlState.terakhirGas < controlState.timerGas){
+    if(controlState.timerGas < Date.now() - controlState.terakhirGas){
       if (targetRodaKiri !== wheelState.kiri) {
         wheelState.kiri = targetRodaKiri;
         publishMqtt(window.ID + '/kiri', wheelState.kiri.toString());
