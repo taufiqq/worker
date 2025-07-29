@@ -5,9 +5,10 @@ const controlState = {
     gas: 0,
     brake: 0,
     gasActive: false,
-    terakhirBelok: 0,
-    tungguBelok : 0,
-    idTimer: null
+    timerGas: 100,
+    timerBelok: 350,
+    terakhirBelok : 0,
+    terakhirGas: 0
 };
 const debugDisplay = document.getElementById('debug-display');
 const activeControls = new Map();
@@ -212,32 +213,11 @@ function mapValueToLevel(inputValue, levelsConfig) {
 
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
-    function setir(belok){
+    
+    if (belok !== wheelState.belok && Date.now() - controlState.terakhirBelok < controlState.timerBelok) {
       publishMqtt(window.ID + '/belok', (92 - belok).toString());
       wheelState.belok = belok;
       controlState.terakhirBelok = Date.now();
-    }
-    if (belok !== wheelState.belok) {
-      let waktuSekarang = Date.now();
-      //cek terakhir belok
-      if(Date.now() - controlState.terakhirBelok < 350){
-        if(controlState.idTimer){
-          clearTimeout(controlState.idTimer);
-          controlState.idTimer = setTimeout(()=>{
-            setir(belok);
-            controlState.idTimer = null;
-            controlState.tungguBelok = Date.now();
-          },Date.now() - controlState.tungguBelok);
-        } else {
-          controlState.idTimer = setTimeout(()=>{
-            setir(belok);
-            controlState.idTimer = null;
-            controlState.tungguBelok = Date.now();
-          },350);
-        }
-      } else {
-        setir(belok);
-      }
     }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
@@ -248,13 +228,16 @@ function processWheelCommands(belok, gas) {
     }
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
-    if (targetRodaKiri !== wheelState.kiri) {
+    
+    if(Date.now() - controlState.terakhirGas < controlState.timerGas){
+      if (targetRodaKiri !== wheelState.kiri) {
         wheelState.kiri = targetRodaKiri;
         publishMqtt(window.ID + '/kiri', wheelState.kiri.toString());
-    }
-    if (targetRodaKanan !== wheelState.kanan) {
+      }
+      if (targetRodaKanan !== wheelState.kanan) {
         wheelState.kanan = targetRodaKanan;
         publishMqtt(window.ID + '/kanan', wheelState.kanan.toString());
+      }
     }
 }
 
@@ -269,7 +252,7 @@ function publishMqtt(topic, message) {
 
 // --- GAME LOOP ---
 function updateGameData() {
-    debugDisplay.textContent = `Setir: ${controlState.steering.toFixed(2)}\nGas  : ${controlState.gas.toFixed(2)}\nRem  : ${controlState.brake}`;
+//    debugDisplay.textContent = `Setir: ${controlState.steering.toFixed(2)}\nGas  : ${controlState.gas.toFixed(2)}\nRem  : ${controlState.brake}`;
     if (controlState.brake > 0) {
         const steeringCommand = mapValueToLevel(controlState.steering, STEERING_LEVELS);
         processWheelCommands(steeringCommand, -200);
