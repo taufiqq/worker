@@ -226,11 +226,12 @@ function processWheelCommands(belok, gas) {
             setir(belok);
             controlState.idTimer = null;
             controlState.tungguBelok = Date.now();
-          },400);
+          },350);
         } else {
           clearTimeout(controlState.idTimer);
           controlState.idTimer = setTimeout(()=>{
             setir(belok);
+            controlState.idTimer = null;
             controlState.tungguBelok = Date.now();
           },Date.now() - controlState.tungguBelok);
         }
@@ -240,10 +241,10 @@ function processWheelCommands(belok, gas) {
     }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
-        case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.7; break;
-        case 35: targetRodaKiri = gas; targetRodaKanan = gas * 0.4; break;
-        case -20: targetRodaKiri = gas * 0.7; targetRodaKanan = gas; break;
-        case -35: targetRodaKiri = gas * 0.4; targetRodaKanan = gas; break;
+        case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.8; break;
+        case 35: targetRodaKiri = gas; targetRodaKanan = gas * 0.6; break;
+        case -20: targetRodaKiri = gas * 0.8; targetRodaKanan = gas; break;
+        case -35: targetRodaKiri = gas * 0.6; targetRodaKanan = gas; break;
     }
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
