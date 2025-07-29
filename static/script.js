@@ -222,18 +222,18 @@ function processWheelCommands(belok, gas) {
       //cek terakhir belok
       if(Date.now() - controlState.terakhirBelok < 350){
         if(controlState.idTimer){
-          controlState.idTimer = setTimeout(()=>{
-            setir(belok);
-            controlState.idTimer = null;
-            controlState.tungguBelok = Date.now();
-          },350);
-        } else {
           clearTimeout(controlState.idTimer);
           controlState.idTimer = setTimeout(()=>{
             setir(belok);
             controlState.idTimer = null;
             controlState.tungguBelok = Date.now();
           },Date.now() - controlState.tungguBelok);
+        } else {
+          controlState.idTimer = setTimeout(()=>{
+            setir(belok);
+            controlState.idTimer = null;
+            controlState.tungguBelok = Date.now();
+          },350);
         }
       } else {
         setir(belok);
