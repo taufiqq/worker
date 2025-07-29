@@ -220,7 +220,7 @@ function processWheelCommands(belok, gas) {
     if (belok !== wheelState.belok) {
       let waktuSekarang = Date.now();
       //cek terakhir belok
-      if(Date.now() - controlState.terakhirBelok < 400){
+      if(Date.now() - controlState.terakhirBelok < 350){
         if(controlState.idTimer){
           controlState.idTimer = setTimeout(()=>{
             setir(belok);
