@@ -233,10 +233,12 @@ function processWheelCommands(belok, gas) {
       if (targetRodaKiri !== wheelState.kiri) {
         wheelState.kiri = targetRodaKiri;
         publishMqtt(window.ID + '/kiri', wheelState.kiri.toString());
+        controlState.terakhirGas = Date.now();
       }
       if (targetRodaKanan !== wheelState.kanan) {
         wheelState.kanan = targetRodaKanan;
         publishMqtt(window.ID + '/kanan', wheelState.kanan.toString());
+        controlState.terakhirGas = Date.now();
       }
     }
 }
