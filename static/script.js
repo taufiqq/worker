@@ -5,6 +5,9 @@ const controlState = {
     gas: 0,
     brake: 0,
     gasActive: false,
+    terakhirBelok: 0,
+    tungguBelok : 0,
+    idTimer: null
 };
 const debugDisplay = document.getElementById('debug-display');
 const activeControls = new Map();
@@ -209,16 +212,38 @@ function mapValueToLevel(inputValue, levelsConfig) {
 
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
+    function setir(belok){
+      publishMqtt(window.ID + '/belok', (92 - belok).toString());
+      wheelState.belok = belok;
+      controlState.terakhirBelok = Date.now();
+    }
     if (belok !== wheelState.belok) {
-        publishMqtt(window.ID + '/belok', (92 - belok).toString());
-        wheelState.belok = belok;
+      let waktuSekarang = Date.now();
+      //cek terakhir belok
+      if(Date.now() - controlState.terakhirBelok < 400){
+        if(controlState.idTimer){
+          controlState.idTimer = setTimeout(()=>{
+            setir(belok);
+            controlState.idTimer = null;
+            controlState.tungguBelok = Date.now();
+          },400);
+        } else {
+          clearTimeout(controlState.idTimer);
+          controlState.idTimer = setTimeout(()=>{
+            setir(belok);
+            controlState.tungguBelok = Date.now();
+          },Date.now() - controlState.tungguBelok);
+        }
+      } else {
+        setir(belok);
+      }
     }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
         case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.7; break;
-        case 40: targetRodaKiri = gas; targetRodaKanan = gas * 0.4; break;
+        case 35: targetRodaKiri = gas; targetRodaKanan = gas * 0.4; break;
         case -20: targetRodaKiri = gas * 0.7; targetRodaKanan = gas; break;
-        case -40: targetRodaKiri = gas * 0.4; targetRodaKanan = gas; break;
+        case -35: targetRodaKiri = gas * 0.4; targetRodaKanan = gas; break;
     }
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
