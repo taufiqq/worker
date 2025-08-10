@@ -1,26 +1,11 @@
+// script.js (VERSI ASLI ANDA, SUDAH DIREKONSTRUKSI)
+
 // --- BAGIAN STATE & SETUP AWAL ---
-const controlState = { /* ... (kode state Anda tidak berubah) ... */ };
+const controlState = { steering: 0, gas: 0, brake: 0, gasActive: false, timerGas: 100, timerBelok: 350, terakhirBelok: 0, terakhirGas: 0 };
 const debugDisplay = document.getElementById('debug-display');
 const activeControls = new Map();
 const initialPositions = new Map();
 let animationFrameId;
-
-// ... (kode setup awal lainnya tidak berubah) ...
-// --- BAGIAN STATE & SETUP AWAL ---
-const controlState = {
-    steering: 0,
-    gas: 0,
-    brake: 0,
-    gasActive: false,
-    timerGas: 100,
-    timerBelok: 350,
-    terakhirBelok: 0,
-    terakhirGas: 0
-};
-const debugDisplay = document.getElementById('debug-display');
-const activeControls = new Map();
-const initialPositions = new Map();
-let animationFrameId; // Variabel global untuk menyimpan ID game loop
 
 document.querySelectorAll('.movable-control').forEach(movable => {
     initialPositions.set(movable, {
@@ -30,15 +15,13 @@ document.querySelectorAll('.movable-control').forEach(movable => {
     });
 });
 
-
 // --- BAGIAN KONTROL UI (SENTUHAN) ---
-// ... (semua fungsi onTouchStart, onTouchMove, onTouchEnd Anda tidak berubah) ...
 function moveElement(element, zone, axis, clientX, clientY) {
     const rect = zone.getBoundingClientRect();
     const targetX = clientX - rect.left;
     const targetY = clientY - rect.top;
 
-    if (axis === 'x') { // Kontrol Setir
+    if (axis === 'x') {
         const halfWidth = element.offsetWidth / 2;
         let newLeft = Math.max(halfWidth, Math.min(targetX, zone.clientWidth - halfWidth));
         element.style.left = `${newLeft}px`;
@@ -46,7 +29,7 @@ function moveElement(element, zone, axis, clientX, clientY) {
         const currentPosition = newLeft - halfWidth;
         const normalizedValue = currentPosition / travelRange;
         controlState.steering = (normalizedValue * 30) - 15;
-    } else if (axis === 'y') { // Kontrol Gas
+    } else if (axis === 'y') {
         const halfHeight = element.offsetHeight / 2;
         let newTop = Math.max(halfHeight, Math.min(targetY, zone.clientHeight - halfHeight));
         element.style.top = `${newTop}px`;
@@ -104,7 +87,6 @@ document.addEventListener('touchmove', onTouchMove, { passive: false });
 document.addEventListener('touchend', onTouchEnd, { passive: false });
 document.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
-// Rem & Gas (State)
 const brakeButton = document.getElementById('brake-pedal');
 brakeButton.addEventListener('touchstart', (e) => { e.preventDefault(); brakeButton.classList.add('is-active'); controlState.brake = 1; });
 brakeButton.addEventListener('touchend', (e) => { e.preventDefault(); brakeButton.classList.remove('is-active'); controlState.brake = 0; });
@@ -114,7 +96,6 @@ gasButton.addEventListener('touchend', () => { controlState.gasActive = false; }
 
 
 // --- BAGIAN LOGIKA MQTT & GAME ---
-// ... (semua logika MQTT Anda tidak berubah) ...
 if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.user) {
     document.body.innerHTML = '<h1 style="color:red; font-family: sans-serif; text-align:center; margin-top: 20vh;">Error: Halaman ini harus diakses melalui URL dengan token yang valid.</h1>';
     throw new Error("MQTT Credentials not injected. Cannot connect.");
@@ -123,111 +104,54 @@ if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.user) {
 const MQTT_HOST = 'xf46ce9c.ala.asia-southeast1.emqxsl.com';
 const MQTT_PORT = 8084;
 const MQTT_CLIENT_ID = `game_controller_paho_${window.MQTT_CREDENTIALS.user}_${Math.random().toString(16).substr(2, 4)}`;
-
 const client = new Paho.Client(MQTT_HOST, MQTT_PORT, MQTT_CLIENT_ID);
-
 client.onConnectionLost = onConnectionLost;
-client.onMessageArrived = onMessageArrived; // Menugaskan 'petugas' pemeriksa pesan
-
-const connectOptions = {
-    useSSL: true,
-    userName: window.MQTT_CREDENTIALS.user,
-    password: window.MQTT_CREDENTIALS.pass,
-    onSuccess: onConnect,
-    onFailure: onConnectionFailure,
-    reconnect: true
-};
-
+client.onMessageArrived = onMessageArrived;
+const connectOptions = { useSSL: true, userName: window.MQTT_CREDENTIALS.user, password: window.MQTT_CREDENTIALS.pass, onSuccess: onConnect, onFailure: onConnectionFailure, reconnect: true };
 function onConnect() {
     console.log('Berhasil terhubung ke broker MQTT!');
-    // --- BARU: Berlangganan ke topik kick setelah berhasil terhubung ---
     const kickTopic = `system/kick/${window.MQTT_CREDENTIALS.user}`;
     client.subscribe(kickTopic);
     console.log(`Berlangganan ke topik kick: ${kickTopic}`);
 }
-
-function onConnectionFailure(response) {
-    console.error('Koneksi MQTT Gagal:', response.errorMessage);
-    showKickOverlay("Gagal terhubung ke server kontrol. Coba muat ulang halaman.");
-}
-
-function onConnectionLost(response) {
-    if (response.errorCode !== 0) {
-        console.log("Koneksi MQTT terputus:", response.errorMessage);
-        showKickOverlay("Koneksi terputus. Harap periksa internet Anda dan muat ulang halaman.");
-    }
-}
-
-// --- BARU: Fungsi untuk menangani pesan masuk (termasuk pesan kick) ---
+function onConnectionFailure(response) { console.error('Koneksi MQTT Gagal:', response.errorMessage); showKickOverlay("Gagal terhubung ke server kontrol. Coba muat ulang halaman."); }
+function onConnectionLost(response) { if (response.errorCode !== 0) { console.log("Koneksi MQTT terputus:", response.errorMessage); showKickOverlay("Koneksi terputus. Harap periksa internet Anda dan muat ulang halaman."); } }
 function onMessageArrived(message) {
     const kickTopic = `system/kick/${window.MQTT_CREDENTIALS.user}`;
-    console.log(`Pesan diterima di topik: ${message.destinationName}`);
-
     if (message.destinationName === kickTopic) {
         console.warn("Menerima sinyal KICK dari server!");
         client.disconnect();
         showKickOverlay("Sesi Anda telah diakhiri oleh admin. Silakan dapatkan link akses baru.");
     }
 }
-
-// --- BARU: Fungsi untuk menampilkan overlay dan menonaktifkan game ---
 function showKickOverlay(text) {
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-    }
+    if (animationFrameId) { cancelAnimationFrame(animationFrameId); }
     const gameControls = document.querySelector('.game-controls');
-    if (gameControls) {
-        gameControls.style.display = 'none';
-    }
+    if (gameControls) { gameControls.style.display = 'none'; }
     let overlay = document.getElementById('kick-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'kick-overlay';
-        Object.assign(overlay.style, {
-            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.9)', color: 'white',
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            textAlign: 'center', zIndex: '10000', fontSize: '1.5em',
-            fontFamily: 'sans-serif', padding: '20px'
-        });
+        Object.assign(overlay.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.9)', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', zIndex: '10000', fontSize: '1.5em', fontFamily: 'sans-serif', padding: '20px' });
         document.body.appendChild(overlay);
     }
     overlay.innerHTML = `<div>⚠️<br><br>${text}</div>`;
     overlay.style.display = 'flex';
 }
-
-console.log(`Menghubungkan ke broker MQTT: wss://${MQTT_HOST}:${MQTT_PORT}`);
 client.connect(connectOptions);
 
-// --- LOGIKA UTAMA PERHITUNGAN RODA & GAME LOOP ---
-// ... (semua logika processWheelCommands, publishMqtt, dan updateGameData Anda tidak berubah) ...
+// --- LOGIKA UTAMA PERHITUNGAN RODA ---
 const wheelState = { kanan: 0, kiri: 0, belok: 0 };
 const GAS_LEVELS = [{ threshold: 1, value: 200 }, { threshold: 11, value: 230 }, { threshold: 26, value: 255 }];
 const STEERING_LEVELS = [{ threshold: -13, value: -35 }, { threshold: -5, value: -20 }, { threshold: 5, value: 20 }, { threshold: 13, value: 35 }];
-
 function mapValueToLevel(inputValue, levelsConfig) {
-    if (inputValue > 0) {
-        for (let i = levelsConfig.length - 1; i >= 0; i--) {
-            const level = levelsConfig[i];
-            if (level.threshold > 0 && inputValue >= level.threshold) return level.value;
-        }
-    } else if (inputValue < 0) {
-        for (let i = 0; i < levelsConfig.length; i++) {
-            const level = levelsConfig[i];
-            if (level.threshold < 0 && inputValue <= level.threshold) return level.value;
-        }
-    }
+    if (inputValue > 0) { for (let i = levelsConfig.length - 1; i >= 0; i--) { const level = levelsConfig[i]; if (level.threshold > 0 && inputValue >= level.threshold) return level.value; } }
+    else if (inputValue < 0) { for (let i = 0; i < levelsConfig.length; i++) { const level = levelsConfig[i]; if (level.threshold < 0 && inputValue <= level.threshold) return level.value; } }
     return 0;
 }
-
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
-    
-    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) {
-      publishMqtt(window.ID + '/belok', (92 - belok).toString());
-      wheelState.belok = belok;
-      controlState.terakhirBelok = Date.now();
-    }
+    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) { publishMqtt(window.ID + '/belok', (92 - belok).toString()); wheelState.belok = belok; controlState.terakhirBelok = Date.now(); }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
         case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.8; break;
@@ -237,32 +161,15 @@ function processWheelCommands(belok, gas) {
     }
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
-    
     if(controlState.timerGas < Date.now() - controlState.terakhirGas){
-      if (targetRodaKiri !== wheelState.kiri) {
-        wheelState.kiri = targetRodaKiri;
-        publishMqtt(window.ID + '/kiri', wheelState.kiri.toString());
-        controlState.terakhirGas = Date.now();
-      }
-      if (targetRodaKanan !== wheelState.kanan) {
-        wheelState.kanan = targetRodaKanan;
-        publishMqtt(window.ID + '/kanan', wheelState.kanan.toString());
-        controlState.terakhirGas = Date.now();
-      }
+      if (targetRodaKiri !== wheelState.kiri) { wheelState.kiri = targetRodaKiri; publishMqtt(window.ID + '/kiri', wheelState.kiri.toString()); controlState.terakhirGas = Date.now(); }
+      if (targetRodaKanan !== wheelState.kanan) { wheelState.kanan = targetRodaKanan; publishMqtt(window.ID + '/kanan', wheelState.kanan.toString()); controlState.terakhirGas = Date.now(); }
     }
 }
+function publishMqtt(topic, message) { if (client.isConnected()) { const mqttMessage = new Paho.Message(message); mqttMessage.destinationName = topic; mqttMessage.qos = 0; client.send(mqttMessage); } }
 
-function publishMqtt(topic, message) {
-    if (client.isConnected()) {
-        const mqttMessage = new Paho.Message(message);
-        mqttMessage.destinationName = topic;
-        mqttMessage.qos = 0;
-        client.send(mqttMessage);
-    }
-}
-
+// --- GAME LOOP ---
 function updateGameData() {
-//    debugDisplay.textContent = `Setir: ${controlState.steering.toFixed(2)}\nGas  : ${controlState.gas.toFixed(2)}\nRem  : ${controlState.brake}`;
     if (controlState.brake > 0) {
         const steeringCommand = mapValueToLevel(controlState.steering, STEERING_LEVELS);
         processWheelCommands(steeringCommand, -200);
@@ -274,70 +181,25 @@ function updateGameData() {
         const steeringCommand = mapValueToLevel(controlState.steering, STEERING_LEVELS);
         processWheelCommands(steeringCommand, 0);
     }
-    animationFrameId = requestAnimationFrame(updateGameData); // Simpan ID untuk bisa dibatalkan
+    animationFrameId = requestAnimationFrame(updateGameData);
 }
 
-
 // --- INISIASI ---
-updateGameData(); // Mulai game loop
+updateGameData();
 
-// --- BARU: LOGIKA ORIENTASI & FULLSCREEN ---
-// Dibungkus di dalam DOMContentLoaded untuk memastikan semua elemen ada
+// --- LOGIKA ORIENTASI & FULLSCREEN ---
 document.addEventListener('DOMContentLoaded', () => {
-    const lockScreen = document.getElementById('orientation-lock');
     const startButton = document.getElementById('start-fullscreen-btn');
-    const gameControls = document.querySelector('.game-controls');
-
-    // Pastikan elemen ada sebelum menambahkan listener
-    if (!lockScreen || !startButton || !gameControls) {
-        console.error("Elemen UI untuk orientasi (#orientation-lock, #start-fullscreen-btn, atau .game-controls) tidak ditemukan.");
-        return;
-    }
-
-    function enterFullscreen() {
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch(err => console.error(err));
-        } else if (elem.mozRequestFullScreen) { // Firefox
-            elem.mozRequestFullScreen();
-        } else if (elem.webkitRequestFullscreen) { // Chrome, Safari
-            elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) { // IE/Edge
-            elem.msRequestFullscreen();
-        }
-        
-        // Coba kunci orientasi setelah masuk fullscreen
-        if (screen.orientation && typeof screen.orientation.lock === 'function') {
-            screen.orientation.lock('landscape').catch(err => console.warn("Tidak dapat mengunci orientasi:", err));
-        }
-    }
-
-    function checkOrientationAndToggleUI() {
-        const isLandscape = screen.orientation ? screen.orientation.type.includes('landscape') : window.innerWidth > window.innerHeight;
-
-        if (isLandscape) {
-            lockScreen.style.display = 'none';
-            gameControls.style.display = 'block';
-        } else {
-            lockScreen.style.display = 'flex';
-            gameControls.style.display = 'none';
-        }
-    }
-
-    // --- DIUBAH: Listener untuk tombol Start ---
-    startButton.addEventListener('click', enterFullscreen);
-    
-    // --- DIUBAH: Jalankan pengecekan dan tambahkan listener ---
-    checkOrientationAndToggleUI(); // Cek saat halaman dimuat
-    
-    // Dengarkan perubahan orientasi
-    window.addEventListener('orientationchange', checkOrientationAndToggleUI);
-    if (screen.orientation) {
-        screen.orientation.addEventListener('change', checkOrientationAndToggleUI);
+    if (startButton) {
+        startButton.addEventListener('click', () => {
+            const docElm = document.documentElement;
+            if (docElm.requestFullscreen) { docElm.requestFullscreen(); }
+            else if (docElm.mozRequestFullScreen) { docElm.mozRequestFullScreen(); }
+            else if (docElm.webkitRequestFullscreen) { docElm.webkitRequestFullscreen(); }
+            else if (docElm.msRequestFullscreen) { docElm.msRequestFullscreen(); }
+            if (screen.orientation && typeof screen.orientation.lock === 'function') {
+                screen.orientation.lock('landscape').catch(err => console.warn("Tidak dapat mengunci orientasi:", err));
+            }
+        });
     }
 });
-
-// --- DIHAPUS: Blok kode orientasi lama yang berada di luar DOMContentLoaded ---
-// Bagian `document.addEventListener('DOMContentLoaded', ...)` yang lama Anda
-// yang hanya berisi logika `startButton` sudah tidak diperlukan karena
-// logikanya telah digabungkan ke dalam blok yang baru.
