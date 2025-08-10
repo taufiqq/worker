@@ -2,58 +2,55 @@
 
 import { Hono } from 'hono';
 
-// Impor komponen yang relevan
-import { WebSocketDO } from './durable-objects/websocket.do.js'; // <-- IMPOR DO BARU
+// IMPOR KOMPONEN
+import { WebSocketDO } from './durable-objects/websocket.do.js'; // PASTIKAN PATH INI BENAR
 import { adminAuth } from './middleware/adminAuth.js';
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
 import { handleTokenClaim } from './routes/token.js';
 import { handleVideoStreamPage } from './routes/video.js';
 
-// Inisialisasi aplikasi Hono
 const app = new Hono();
 
 // ==========================================================
-// PENDEFINISIAN RUTE (Perakitan)
+// RUTE-RUTE APLIKASI
 // ==========================================================
 
-// --- RUTE #1: Admin Panel ---
+// --- Rute Admin Panel ---
 app.get('/admin', adminAuth, handleAdminPage);
 
-// --- RUTE #2: Admin API ---
+// --- Rute Admin API ---
 app.route('/api/admin', adminApiRoutes);
 
-// Rute ini akan menangkap URL seperti /video/123, /video/456, dll.
+// --- Rute Halaman Streamer Video ---
 app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage);
 
-// --- RUTE BARU: WebSocket Signaling ---
-// Rute ini akan menangani koneksi WebSocket. Klien akan terhubung ke wss://domain.com/ws/SESSION_ID
+// --- Rute WebSocket Signaling ---
 app.get('/ws/:sessionId', c => {
-    // Dapatkan ID unik untuk Durable Object dari sessionId.
-    // Pastikan ID ini selalu memiliki panjang yang sama untuk keamanan.
     const sessionId = c.req.param('sessionId');
-    if (sessionId.length < 10) { // Contoh validasi sederhana
+    if (!sessionId || sessionId.length < 10) {
       return new Response("Invalid Session ID", { status: 400 });
     }
+    // Dapatkan instance Durable Object berdasarkan nama unik (sessionId)
     const id = c.env.WEBSOCKET_DO.idFromName(sessionId);
     const stub = c.env.WEBSOCKET_DO.get(id);
 
-    // Teruskan permintaan ke Durable Object untuk di-upgrade.
+    // Teruskan permintaan ke Durable Object untuk di-upgrade
     return stub.fetch(c.req.raw);
 });
 
-
-// --- RUTE #3: Token Pengguna (Generik) ---
+// --- Rute Klaim Token ---
 app.get('/:token', handleTokenClaim);
 
-// --- RUTE #4: Fallback untuk Aset Statis dan Root ---
+// --- Rute Fallback (untuk aset statis seperti CSS, JS, HTML) ---
 app.get('*', (c) => {
     return c.env.ASSETS.fetch(c.req.raw);
 });
 
-// --- Ekspor Worker ---
+// ==========================================================
+// EKSPOR UTAMA UNTUK CLOUDFLARE WORKERS
+// ==========================================================
 export default {
   fetch: app.fetch,
-  // Ekspor Durable Object kita agar Cloudflare tahu cara membuatnya.
-  WebSocketDO: WebSocketDO, 
+  WebSocketDO: WebSocketDO, // <-- BAGIAN PALING PENTING UNTUK MEMPERBAIKI ERROR
 };
