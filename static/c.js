@@ -151,7 +151,7 @@ function mapValueToLevel(inputValue, levelsConfig) {
 }
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
-    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) { publishMqtt(window.ID + '/belok', (92 - belok).toString()); wheelState.belok = belok; controlState.terakhirBelok = Date.now(); }
+    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) { publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/belok', (92 - belok).toString()); wheelState.belok = belok; controlState.terakhirBelok = Date.now(); }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
         case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.8; break;
@@ -162,8 +162,8 @@ function processWheelCommands(belok, gas) {
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
     if(controlState.timerGas < Date.now() - controlState.terakhirGas){
-      if (targetRodaKiri !== wheelState.kiri) { wheelState.kiri = targetRodaKiri; publishMqtt(window.ID + '/kiri', wheelState.kiri.toString()); controlState.terakhirGas = Date.now(); }
-      if (targetRodaKanan !== wheelState.kanan) { wheelState.kanan = targetRodaKanan; publishMqtt(window.ID + '/kanan', wheelState.kanan.toString()); controlState.terakhirGas = Date.now(); }
+      if (targetRodaKiri !== wheelState.kiri) { wheelState.kiri = targetRodaKiri; publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/kiri', wheelState.kiri.toString()); controlState.terakhirGas = Date.now(); }
+      if (targetRodaKanan !== wheelState.kanan) { wheelState.kanan = targetRodaKanan; publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/kanan', wheelState.kanan.toString()); controlState.terakhirGas = Date.now(); }
     }
 }
 function publishMqtt(topic, message) { if (client.isConnected()) { const mqttMessage = new Paho.Message(message); mqttMessage.destinationName = topic; mqttMessage.qos = 0; client.send(mqttMessage); } }
