@@ -57,10 +57,11 @@ app.get('*', (c) => {
 // EKSPOR UTAMA (PALING PENTING!)
 // ==========================================================
 export default {
-  // Menangani semua permintaan HTTP melalui Hono
-  fetch: app.fetch,
+  async fetch(request, env, ctx) {
+    // Panggil handler Hono di dalam fungsi fetch yang standar
+    return app.fetch(request, env, ctx);
+  },
 
-  // Mendaftarkan kelas Durable Object ke runtime Cloudflare.
-  // Nama properti `WebSocketDO` harus sama persis dengan `class_name` di wrangler.toml
+  // Ekspor Durable Object tetap sama
   WebSocketDO: WebSocketDO,
 };
