@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 
 // Impor komponen yang relevan
 // HAPUS: import { ClaimLockDO } from './durable-objects/claimLock.do.js';
+import { ClaimLockDO } from './durable-objects/claimLock.do.js';
 import { adminAuth } from './middleware/adminAuth.js';
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
@@ -38,5 +39,5 @@ app.get('*', (c) => {
 // --- Ekspor Worker ---
 export default {
   fetch: app.fetch,
-//  ClaimLockDO: ClaimLockDO, 
+  ClaimLockDO: ClaimLockDO, 
 };
