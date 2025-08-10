@@ -38,5 +38,5 @@ app.get('*', (c) => {
 // --- Ekspor Worker ---
 export default {
   fetch: app.fetch,
-  ClaimLockDO: ClaimLockDO, 
+//  ClaimLockDO: ClaimLockDO, 
 };
