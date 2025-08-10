@@ -20,3 +20,4 @@ database_id = "0c98dba8-35ca-4ba4-a7ae-6fd5617985f4"
 
 [[migrations]]
 tag = "v2"
+deleted_classes = "ClaimLockDO"
