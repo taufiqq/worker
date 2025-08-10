@@ -21,6 +21,12 @@ id = "65af14e6ce5f4aad928fc3e474c8642e"
 name = "CLAIM_LOCK_DO" # Nama yang akan kita gunakan di kode: c.env.CLAIM_LOCK_DO
 class_name = "ClaimLockDO"
 
+
+[[d1_databases]]
+binding = "DB" # Nama variabel yang akan digunakan di kode Worker
+database_name = "tokens"
+database_id = "0c98dba8-35ca-4ba4-a7ae-6fd5617985f4"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ClaimLockDO"]
