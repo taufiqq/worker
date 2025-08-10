@@ -1,16 +1,14 @@
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #333;
-            background-image: url('https://images.unsplash.com/photo-1614729589139-8a3568323867?q=80&w=1974');
-            background-size: cover;
-            background-position: center;
-            font-family: sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    background-color: #111; /* Fallback jika video tidak muncul */
+}
+
 
         /* ZONA INTERAKSI (AREA SENTUH) */
         .control-zone {
@@ -171,13 +169,13 @@
 
 /* --- STYLING UNTUK VIDEO FPV --- */
 #fpv-container {
-    position: absolute;
+    position: fixed; /* Gunakan fixed agar tetap di viewport */
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1; /* Ditempatkan di belakang kontrol game */
-    background-color: #1a1a1a;
+    z-index: 1; /* DI ATAS BODY, DI BAWAH KONTROL */
+    background-color: #1a1a1a; /* Tampil jika video belum termuat */
 }
 
 #remoteVideo {
@@ -203,6 +201,8 @@
 
 /* Memastikan kontrol game berada di atas video */
 .game-controls {
-    position: relative;
+    position: relative; /* Buat stacking context baru */
     z-index: 10;
+    width: 100%;
+    height: 100%;
 }
