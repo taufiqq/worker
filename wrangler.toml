@@ -10,17 +10,8 @@ directory = "./static"
 binding = "ASSETS"
 
 [[kv_namespaces]]
-binding = "TOKEN"
-id = "e4b68d7dd477413fbe140f59259254c7" # Ganti dengan ID KV Anda
-
-[[kv_namespaces]]
 binding = "ADMIN"
 id = "65af14e6ce5f4aad928fc3e474c8642e"
-
-[[durable_objects.bindings]]
-name = "CLAIM_LOCK_DO" # Nama yang akan kita gunakan di kode: c.env.CLAIM_LOCK_DO
-class_name = "ClaimLockDO"
-
 
 [[d1_databases]]
 binding = "DB" # Nama variabel yang akan digunakan di kode Worker
