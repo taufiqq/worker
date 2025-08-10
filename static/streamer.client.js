@@ -1,4 +1,4 @@
-// public/streamer.client.js
+// File: public/streamer.client.js
 
 document.addEventListener('DOMContentLoaded', () => {
     const startButton = document.getElementById('startButton');
@@ -15,11 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = `Status: ${message}`;
     };
 
-    // --- BACA SESSION ID DARI SERVER ---
+    // 1. Baca Session ID yang disuntikkan oleh server
     if (!window.WEBRTC_SESSION_ID) {
-        updateStatus('ERROR: Session ID tidak ditemukan. Halaman tidak dimuat dengan benar.');
-        sessionIdDisplay.textContent = 'Error! Gagal memuat ID.';
-        document.body.style.backgroundColor = '#ffcdd2';
+        updateStatus('ERROR: Session ID tidak ditemukan.');
         return;
     }
     const sessionId = window.WEBRTC_SESSION_ID;
@@ -27,28 +25,24 @@ document.addEventListener('DOMContentLoaded', () => {
     startButton.disabled = false;
 
     const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    
-    // --- FUNGSI SIGNALING BARU DENGAN WEBSOCKET ---
+
+    // 2. Fungsi untuk mengirim sinyal melalui WebSocket
     function sendSignal(type, data) {
         if (ws && ws.readyState === WebSocket.OPEN) {
-            const message = JSON.stringify({ type, data });
-            ws.send(message);
-        } else {
-            updateStatus('Error: WebSocket tidak terhubung. Gagal mengirim sinyal.');
+            ws.send(JSON.stringify({ type, data }));
         }
     }
-    
+
+    // 3. Fungsi untuk membuat koneksi WebSocket
     function setupWebSocket() {
-        // Tentukan protokol (wss untuk https, ws untuk http)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
-        
-        updateStatus(`Menghubungkan ke server signaling: ${wsUrl}`);
+
+        updateStatus(`Menghubungkan ke ${wsUrl}`);
         ws = new WebSocket(wsUrl);
 
         ws.onopen = async () => {
-            updateStatus('Terhubung ke server signaling. Mengirim offer...');
-            // Kirim offer setelah koneksi WebSocket berhasil dibuka
+            updateStatus('Koneksi WebSocket terbuka. Membuat dan mengirim offer...');
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             sendSignal('offer', offer);
@@ -56,68 +50,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ws.onmessage = async (event) => {
             const signal = JSON.parse(event.data);
-            
-            updateStatus(`Menerima sinyal tipe: ${signal.type}`);
+            updateStatus(`Menerima sinyal: ${signal.type}`);
 
             if (signal.type === 'answer') {
-                if (peerConnection.signalingState !== 'stable') {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
-                    updateStatus('Answer diterima.');
-                }
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
             } else if (signal.type === 'candidate') {
-                // Antrian tidak diperlukan lagi karena WebSocket memastikan urutan
                 await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
-            } else if (signal.error) {
-                updateStatus(`Error dari server: ${signal.error}`);
             }
         };
 
-        ws.onclose = () => {
-            updateStatus('Koneksi WebSocket ditutup.');
-        };
-        
-        ws.onerror = (error) => {
-            console.error('WebSocket Error:', error);
-            updateStatus('Error pada koneksi WebSocket.');
-        };
+        ws.onclose = () => updateStatus('Koneksi WebSocket ditutup.');
+        ws.onerror = (err) => updateStatus(`WebSocket Error: ${err.message || 'Tidak diketahui'}`);
     }
 
+    // 4. Logika saat tombol "Start" diklik
     startButton.onclick = async () => {
         startButton.disabled = true;
-        updateStatus('Memulai...');
+        updateStatus('Memulai kamera...');
 
         try {
-            const backCameraConstraints = { video: { width: { exact: 640 }, height: { exact: 360 }, frameRate: { ideal: 24, max: 24 }, facingMode: { ideal: "environment" } }, audio: false };
-            const frontCameraConstraints = { video: { width: { exact: 640 }, height: { exact: 360 }, frameRate: { ideal: 24, max: 24 }, facingMode: "user" }, audio: false };
-            
-            try {
-                updateStatus('Mencoba kamera belakang...');
-                localStream = await navigator.mediaDevices.getUserMedia(backCameraConstraints);
-            } catch (err) {
-                updateStatus('Beralih ke kamera depan...');
-                localStream = await navigator.mediaDevices.getUserMedia(frontCameraConstraints);
-            }
-            
-            localVideo.srcObject = localStream;
-            updateStatus('Kamera berhasil diakses.');
+            const constraints = {
+                video: { width: { exact: 640 }, height: { exact: 360 }, frameRate: 24, facingMode: "environment" },
+                audio: false
+            };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints)
+                .catch(() => navigator.mediaDevices.getUserMedia({ ...constraints, video: { ...constraints.video, facingMode: "user" }}));
 
-            // Buat PeerConnection
+            localVideo.srcObject = localStream;
+            updateStatus('Kamera aktif. Menyiapkan koneksi peer...');
+
             peerConnection = new RTCPeerConnection(configuration);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            
+
             peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    sendSignal('candidate', event.candidate);
-                }
+                if (event.candidate) sendSignal('candidate', event.candidate);
             };
-            
-            peerConnection.onconnectionstatechange = () => {
-                updateStatus(`Connection state: ${peerConnection.connectionState}`);
-            };
+            peerConnection.onconnectionstatechange = () => updateStatus(`Status koneksi peer: ${peerConnection.connectionState}`);
 
-            // Buat dan atur koneksi WebSocket. Offer akan dikirim di dalam `ws.onopen`.
-            setupWebSocket();
-
+            setupWebSocket(); // Mulai koneksi WebSocket
         } catch (error) {
             updateStatus(`Error: ${error.message}`);
             startButton.disabled = false;

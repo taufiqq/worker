@@ -1,56 +1,66 @@
-// src/index.js - Titik Masuk dan Router Utama
+// File: src/index.js
 
 import { Hono } from 'hono';
 
-// IMPOR KOMPONEN
-import { WebSocketDO } from './durable-objects/websocket.do.js'; // PASTIKAN PATH INI BENAR
+// IMPOR SEMUA KOMPONEN YANG DIPERLUKAN
+import { WebSocketDO } from './durable-objects/websocket.do.js';
 import { adminAuth } from './middleware/adminAuth.js';
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
 import { handleTokenClaim } from './routes/token.js';
 import { handleVideoStreamPage } from './routes/video.js';
 
+// Inisialisasi aplikasi Hono
 const app = new Hono();
 
 // ==========================================================
-// RUTE-RUTE APLIKASI
+// DEFINISI RUTE
 // ==========================================================
 
-// --- Rute Admin Panel ---
+// Rute Admin Panel
 app.get('/admin', adminAuth, handleAdminPage);
 
-// --- Rute Admin API ---
+// Rute Admin API
 app.route('/api/admin', adminApiRoutes);
 
-// --- Rute Halaman Streamer Video ---
+// Rute untuk menyajikan halaman streamer
 app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage);
 
-// --- Rute WebSocket Signaling ---
+// RUTE BARU: Menangani Upgrade WebSocket
+// Klien akan terhubung ke wss://domain-anda.com/ws/SESSION_ID
 app.get('/ws/:sessionId', c => {
     const sessionId = c.req.param('sessionId');
-    if (!sessionId || sessionId.length < 10) {
-      return new Response("Invalid Session ID", { status: 400 });
-    }
-    // Dapatkan instance Durable Object berdasarkan nama unik (sessionId)
-    const id = c.env.WEBSOCKET_DO.idFromName(sessionId);
-    const stub = c.env.WEBSOCKET_DO.get(id);
 
-    // Teruskan permintaan ke Durable Object untuk di-upgrade
-    return stub.fetch(c.req.raw);
+    // Validasi sederhana untuk mencegah ID yang tidak valid
+    if (!sessionId || sessionId.length < 10) {
+      return new Response("Invalid Session ID format", { status: 400 });
+    }
+
+    // Dapatkan ID unik untuk Durable Object dari nama sesi.
+    const doId = c.env.WEBSOCKET_DO.idFromName(sessionId);
+    // Dapatkan "stub" atau perwakilan dari Durable Object tersebut.
+    const doStub = c.env.WEBSOCKET_DO.get(doId);
+
+    // Teruskan permintaan ke Durable Object untuk di-upgrade menjadi koneksi WebSocket.
+    return doStub.fetch(c.req.raw);
 });
 
-// --- Rute Klaim Token ---
+// Rute untuk klaim token oleh pengguna
 app.get('/:token', handleTokenClaim);
 
-// --- Rute Fallback (untuk aset statis seperti CSS, JS, HTML) ---
+// Rute Fallback untuk aset statis (CSS, JS klien, gambar, dll)
 app.get('*', (c) => {
     return c.env.ASSETS.fetch(c.req.raw);
 });
 
 // ==========================================================
-// EKSPOR UTAMA UNTUK CLOUDFLARE WORKERS
+// EKSPOR UTAMA (PALING PENTING!)
 // ==========================================================
 export default {
+  // Menangani semua permintaan HTTP melalui Hono
   fetch: app.fetch,
-  WebSocketDO: WebSocketDO, // <-- BAGIAN PALING PENTING UNTUK MEMPERBAIKI ERROR
+
+  // Mendaftarkan kelas Durable Object ke runtime Cloudflare.
+  // Nama properti `WebSocketDO` harus sama persis dengan `class_name` di wrangler.toml
+  WebSocketDO: WebSocketDO,
 };
