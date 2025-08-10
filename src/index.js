@@ -3,12 +3,12 @@
 import { Hono } from 'hono';
 
 // Impor komponen yang relevan
-// HAPUS: import { ClaimLockDO } from './durable-objects/claimLock.do.js';
+import { WebSocketDO } from './durable-objects/websocket.do.js'; // <-- IMPOR DO BARU
 import { adminAuth } from './middleware/adminAuth.js';
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
 import { handleTokenClaim } from './routes/token.js';
-import { handleVideoStreamPage } from './routes/video.js'; // <-- IMPOR BARU
+import { handleVideoStreamPage } from './routes/video.js';
 
 // Inisialisasi aplikasi Hono
 const app = new Hono();
@@ -24,67 +24,24 @@ app.get('/admin', adminAuth, handleAdminPage);
 app.route('/api/admin', adminApiRoutes);
 
 // Rute ini akan menangkap URL seperti /video/123, /video/456, dll.
-app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage); // <-- RUTE BARU
+app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage);
 
-// Rute khusus untuk menangani koneksi WebSocket
-app.get('/ws', (c) => {
-  // Cari header "Upgrade: websocket".
-  const upgradeHeader = c.req.header('Upgrade');
-
-  if (!upgradeHeader || upgradeHeader !== 'websocket') {
-    return new Response('Diharapkan request WebSocket.', { status: 426 });
-  }
-
-  // Jika ini adalah permintaan WebSocket, buat WebSocketPair.
-  const { 0: client, 1: server } = new WebSocketPair();
-
-  // Terima koneksi pada sisi server
-  server.accept();
-
-  // State (counter) untuk koneksi ini saja
-  let count = 0;
-
-  // Kirim pesan selamat datang
-  server.send(JSON.stringify({
-    message: 'Halo dari Hono WebSocket! Anda terhubung.',
-    count: count
-  }));
-
-  // Listener untuk pesan dari klien
-  server.addEventListener('message', async (event) => {
-    const command = event.data;
-
-    if (command === 'increment') {
-      count++;
-      server.send(JSON.stringify({ message: 'Counter ditambah!', count: count }));
-    } else if (command === 'decrement') {
-      count--;
-      server.send(JSON.stringify({ message: 'Counter dikurangi!', count: count }));
-    } else if (command === 'reset') {
-      count = 0;
-      server.send(JSON.stringify({ message: 'Counter direset!', count: count }));
-    } else {
-      server.send(JSON.stringify({ message: `Perintah tidak dikenal: "${command}"`, count: count }));
+// --- RUTE BARU: WebSocket Signaling ---
+// Rute ini akan menangani koneksi WebSocket. Klien akan terhubung ke wss://domain.com/ws/SESSION_ID
+app.get('/ws/:sessionId', c => {
+    // Dapatkan ID unik untuk Durable Object dari sessionId.
+    // Pastikan ID ini selalu memiliki panjang yang sama untuk keamanan.
+    const sessionId = c.req.param('sessionId');
+    if (sessionId.length < 10) { // Contoh validasi sederhana
+      return new Response("Invalid Session ID", { status: 400 });
     }
-  });
+    const id = c.env.WEBSOCKET_DO.idFromName(sessionId);
+    const stub = c.env.WEBSOCKET_DO.get(id);
 
-  // Listener untuk koneksi yang ditutup
-  server.addEventListener('close', (event) => {
-    console.log(`Koneksi ditutup. Kode: ${event.code}, Alasan: ${event.reason}`);
-  });
-
-  // Listener untuk error
-  server.addEventListener('error', (event) => {
-    console.error('Terjadi error pada WebSocket:', event);
-  });
-
-  // Kembalikan response dengan status 101 dan lampirkan WebSocket
-  // Ini adalah cara standar untuk "meng-upgrade" koneksi HTTP ke WebSocket.
-  return new Response(null, {
-    status: 101,
-    webSocket: client,
-  });
+    // Teruskan permintaan ke Durable Object untuk di-upgrade.
+    return stub.fetch(c.req.raw);
 });
+
 
 // --- RUTE #3: Token Pengguna (Generik) ---
 app.get('/:token', handleTokenClaim);
@@ -97,5 +54,6 @@ app.get('*', (c) => {
 // --- Ekspor Worker ---
 export default {
   fetch: app.fetch,
-//  ClaimLockDO: ClaimLockDO, 
+  // Ekspor Durable Object kita agar Cloudflare tahu cara membuatnya.
+  WebSocketDO: WebSocketDO, 
 };

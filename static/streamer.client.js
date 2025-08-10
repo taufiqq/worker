@@ -6,89 +6,83 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionIdDisplay = document.getElementById('sessionIdDisplay');
     const statusDiv = document.getElementById('status');
 
+    let peerConnection;
+    let localStream;
+    let ws; // Variabel untuk koneksi WebSocket
+
     const updateStatus = (message) => {
         console.log(message);
         statusDiv.textContent = `Status: ${message}`;
     };
 
     // --- BACA SESSION ID DARI SERVER ---
-    // Variabel ini disuntikkan oleh server ke dalam HTML.
     if (!window.WEBRTC_SESSION_ID) {
         updateStatus('ERROR: Session ID tidak ditemukan. Halaman tidak dimuat dengan benar.');
         sessionIdDisplay.textContent = 'Error! Gagal memuat ID.';
         document.body.style.backgroundColor = '#ffcdd2';
-        return; // Hentikan eksekusi jika ID tidak ada
+        return;
     }
     const sessionId = window.WEBRTC_SESSION_ID;
     sessionIdDisplay.textContent = sessionId;
-    startButton.disabled = false; // Aktifkan tombol karena ID sudah ada
+    startButton.disabled = false;
 
-    // --- PENGATURAN SUPABASE (Tetap sama) ---
-    const SUPABASE_URL = 'https://umqbiksfxyiarsftwkac.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtcWJpa3NmeHlpYXJzZnR3a2FjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxNTM1NTUsImV4cCI6MjA2ODcyOTU1NX0.bNylE96swkVo5rNvqY5JDiM-nSFcs6nEGZEiFpNpos0';
-    const supabaseC = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    // -----------------------------------------------------------
-
-    const clientId = 'pengirim-' + Math.random().toString(36).substr(2, 9);
     const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    let peerConnection;
-    let localStream;
-    let remoteCandidateQueue = [];
-
-    // Fungsi sendSignal dan subscribeToSignals tidak perlu diubah.
-    // Copy-paste dari file pengirim.js Anda.
-    async function sendSignal(type, data) { /* ... (tidak ada perubahan) ... */ }
-    function subscribeToSignals() { /* ... (tidak ada perubahan) ... */ }
     
-    // --- (Paste fungsi sendSignal dan subscribeToSignals di sini) ---
-    async function sendSignal(type, data) {
-        await supabaseC.from('webrtc_signals').insert([
-            { session_id: sessionId, sender_id: clientId, type: type, data: data }
-        ]);
+    // --- FUNGSI SIGNALING BARU DENGAN WEBSOCKET ---
+    function sendSignal(type, data) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const message = JSON.stringify({ type, data });
+            ws.send(message);
+        } else {
+            updateStatus('Error: WebSocket tidak terhubung. Gagal mengirim sinyal.');
+        }
     }
+    
+    function setupWebSocket() {
+        // Tentukan protokol (wss untuk https, ws untuk http)
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+        
+        updateStatus(`Menghubungkan ke server signaling: ${wsUrl}`);
+        ws = new WebSocket(wsUrl);
 
-    function subscribeToSignals() {
-        supabaseC.channel(`webrtc-signals-${sessionId}`)
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'webrtc_signals', filter: `session_id=eq.${sessionId}`},
-                async (payload) => {
-                    const signal = payload.new;
-                    if (signal.sender_id === clientId) return;
+        ws.onopen = async () => {
+            updateStatus('Terhubung ke server signaling. Mengirim offer...');
+            // Kirim offer setelah koneksi WebSocket berhasil dibuka
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            sendSignal('offer', offer);
+        };
 
-                    updateStatus(`Menerima sinyal tipe: ${signal.type}`);
-                    const signalData = signal.data;
+        ws.onmessage = async (event) => {
+            const signal = JSON.parse(event.data);
+            
+            updateStatus(`Menerima sinyal tipe: ${signal.type}`);
 
-                    if (signal.type === 'answer') {
-                        if (peerConnection.signalingState !== 'stable') {
-                            await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
-                            updateStatus('Answer diterima.');
-                            while(remoteCandidateQueue.length > 0) {
-                                await peerConnection.addIceCandidate(remoteCandidateQueue.shift());
-                            }
-                        }
-                    } else if (signal.type === 'candidate') {
-                        if (peerConnection.remoteDescription) {
-                            await peerConnection.addIceCandidate(new RTCIceCandidate(signalData));
-                        } else {
-                            remoteCandidateQueue.push(new RTCIceCandidate(signalData));
-                        }
-                    }
+            if (signal.type === 'answer') {
+                if (peerConnection.signalingState !== 'stable') {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
+                    updateStatus('Answer diterima.');
                 }
-            )
-            .subscribe((status, err) => {
-                if (status === 'SUBSCRIBED') {
-                    updateStatus('Berhasil subscribe ke channel. Menunggu penerima...');
-                } else {
-                    updateStatus(`Gagal subscribe: ${err?.message || 'error'}`);
-                }
-            });
+            } else if (signal.type === 'candidate') {
+                // Antrian tidak diperlukan lagi karena WebSocket memastikan urutan
+                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
+            } else if (signal.error) {
+                updateStatus(`Error dari server: ${signal.error}`);
+            }
+        };
+
+        ws.onclose = () => {
+            updateStatus('Koneksi WebSocket ditutup.');
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket Error:', error);
+            updateStatus('Error pada koneksi WebSocket.');
+        };
     }
-
 
     startButton.onclick = async () => {
-        // Logika untuk memulai stream tidak perlu diubah.
-        // Copy-paste dari file pengirim.js Anda.
         startButton.disabled = true;
         updateStatus('Memulai...');
 
@@ -106,17 +100,23 @@ document.addEventListener('DOMContentLoaded', () => {
             
             localVideo.srcObject = localStream;
             updateStatus('Kamera berhasil diakses.');
+
+            // Buat PeerConnection
             peerConnection = new RTCPeerConnection(configuration);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
             peerConnection.onicecandidate = event => {
-                if (event.candidate) sendSignal('candidate', event.candidate);
+                if (event.candidate) {
+                    sendSignal('candidate', event.candidate);
+                }
             };
-            peerConnection.onconnectionstatechange = () => updateStatus(`Connection state: ${peerConnection.connectionState}`);
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            updateStatus('Offer dibuat, mengirim ke server...');
-            await sendSignal('offer', offer);
-            subscribeToSignals();
+            
+            peerConnection.onconnectionstatechange = () => {
+                updateStatus(`Connection state: ${peerConnection.connectionState}`);
+            };
+
+            // Buat dan atur koneksi WebSocket. Offer akan dikirim di dalam `ws.onopen`.
+            setupWebSocket();
 
         } catch (error) {
             updateStatus(`Error: ${error.message}`);

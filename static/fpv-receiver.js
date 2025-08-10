@@ -9,126 +9,118 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // --- PENGATURAN SUPABASE ---
-    const SUPABASE_URL = 'https://umqbiksfxyiarsftwkac.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtcWJpa3NmeHlpYXJzZnR3a2FjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxNTM1NTUsImV4cCI6MjA2ODcyOTU1NX0.bNylE96swkVo5rNvqY5JDiM-nSFcs6nEGZEiFpNpos0';
-    const supabaseC = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    // ---------------------------
+    let peerConnection;
+    let sessionId;
+    let ws; // Variabel WebSocket
 
-    const clientId = 'penerima-' + Math.random().toString(36).substr(2, 9);
     const configuration = {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     };
-
-    let peerConnection;
-    let sessionId;
 
     const updateStatus = (message) => {
         console.log(message);
         statusDiv.textContent = `Status: ${message}`;
     };
 
+    // --- FUNGSI SIGNALING BARU DENGAN WEBSOCKET ---
     async function sendSignal(type, data) {
         if (!sessionId) return;
-        await supabaseC.from('webrtc_signals').insert([
-            { session_id: sessionId, sender_id: clientId, type: type, data: data }
-        ]);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type, data }));
+        } else {
+             updateStatus('Error: WebSocket tidak terhubung. Gagal mengirim sinyal.');
+        }
     }
 
-    function subscribeToSignals() {
+    function setupWebSocket() {
         if (!sessionId) return;
-
-        const channel = supabaseC.channel(`webrtc-signals-${sessionId}`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
         
-        channel.on(
-            'postgres_changes',
-            { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'webrtc_signals',
-                filter: `session_id=eq.${sessionId}`
-            },
-            async (payload) => {
-                const signal = payload.new;
+        updateStatus(`Menghubungkan ke server signaling: ${wsUrl}`);
+        ws = new WebSocket(wsUrl);
 
-                if (signal.sender_id === clientId) return; // Abaikan sinyal sendiri
+        ws.onopen = () => {
+            updateStatus('Terhubung ke server signaling. Menunggu offer dari pengirim...');
+        };
 
-                updateStatus(`Menerima sinyal tipe: ${signal.type}`);
-                const signalData = signal.data;
+        ws.onmessage = async (event) => {
+            const signal = JSON.parse(event.data);
+            
+            updateStatus(`Menerima sinyal tipe: ${signal.type}`);
 
-                if (signal.type === 'offer') {
-                    // Buat peer connection baru jika belum ada atau jika koneksi sebelumnya gagal
-                    if (peerConnection) {
-                        peerConnection.close();
-                    }
-                    peerConnection = new RTCPeerConnection(configuration);
-                    
-                    peerConnection.ontrack = event => {
-                        updateStatus('Menerima stream video!');
-                        if (remoteVideo.srcObject !== event.streams[0]) {
-                            remoteVideo.srcObject = event.streams[0];
-                        }
-                    };
-
-                    peerConnection.onicecandidate = event => {
-                        if (event.candidate) {
-                            updateStatus('Mengirim ICE candidate...');
-                            sendSignal('candidate', event.candidate);
-                        }
-                    };
-
-                    peerConnection.onconnectionstatechange = () => {
-                        const state = peerConnection.connectionState;
-                        updateStatus(`Koneksi: ${state}`);
-                        if (state === 'connected') {
-                            statusDiv.style.display = 'none'; // Sembunyikan status jika sudah terhubung
-                        } else {
-                            statusDiv.style.display = 'block'; // Tampilkan lagi jika terputus/gagal
-                        }
-                    };
-                    
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-
-                    updateStatus('Answer dibuat, mengirim ke pengirim...');
-                    await sendSignal('answer', answer);
-
-                } else if (signal.type === 'candidate' && peerConnection) {
-                    try {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(signalData));
-                    } catch(e) {
-                        console.error('Error menambah ICE candidate:', e);
-                        updateStatus(`Error ICE candidate: ${e.message}`);
-                    }
+            if (signal.type === 'offer') {
+                if (peerConnection) {
+                    peerConnection.close();
                 }
+                peerConnection = new RTCPeerConnection(configuration);
+                
+                peerConnection.ontrack = event => {
+                    updateStatus('Menerima stream video!');
+                    if (remoteVideo.srcObject !== event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
+                };
+
+                peerConnection.onicecandidate = e => {
+                    if (e.candidate) {
+                        updateStatus('Mengirim ICE candidate...');
+                        sendSignal('candidate', e.candidate);
+                    }
+                };
+
+                peerConnection.onconnectionstatechange = () => {
+                    const state = peerConnection.connectionState;
+                    updateStatus(`Koneksi: ${state}`);
+                    if (state === 'connected') {
+                        statusDiv.style.display = 'none';
+                    } else {
+                        statusDiv.style.display = 'block';
+                    }
+                };
+                
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                updateStatus('Answer dibuat, mengirim ke pengirim...');
+                await sendSignal('answer', answer);
+
+            } else if (signal.type === 'candidate' && peerConnection) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
+                } catch(e) {
+                    console.error('Error menambah ICE candidate:', e);
+                    updateStatus(`Error ICE candidate: ${e.message}`);
+                }
+            } else if (signal.error) {
+                updateStatus(`Error dari server: ${signal.error}`);
             }
-        )
-        .subscribe((status, err) => {
-             if (status === 'SUBSCRIBED') {
-                updateStatus('Menunggu Offer dari pengirim...');
-            } else {
-                updateStatus(`Gagal subscribe: ${err?.message || 'error'}`);
-            }
-        });
+        };
+
+        ws.onclose = () => {
+            updateStatus('Koneksi WebSocket ditutup. Coba refresh halaman untuk terhubung kembali.');
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket Error:', error);
+            updateStatus('Error pada koneksi WebSocket.');
+        };
     }
 
     function initializeFpvConnection() {
-        // Ambil token dari path URL, contoh: "situs.com/token123" -> "token123"
         const pathParts = window.location.pathname.split('/').filter(Boolean);
         sessionId = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
 
         if (!sessionId) {
             updateStatus("Error: Session ID (token) tidak ditemukan di URL.");
-            // Non-aktifkan FPV jika tidak ada ID, tapi jangan tampilkan alert agar tidak mengganggu
-            console.error("Tidak dapat menemukan Session ID di URL. FPV tidak akan aktif.");
             return;
         }
 
         updateStatus(`Mencoba terhubung ke sesi FPV: ${sessionId}`);
-        subscribeToSignals();
+        // Mulai koneksi WebSocket
+        setupWebSocket();
     }
 
-    // Panggil fungsi inisialisasi untuk memulai koneksi FPV
     initializeFpvConnection();
 });
