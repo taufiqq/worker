@@ -26,7 +26,7 @@ app.route('/api/admin', adminApiRoutes);
 // Rute ini akan menangkap URL seperti /video/123, /video/456, dll.
 app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage); // <-- RUTE BARU
 
-/ Rute khusus untuk menangani koneksi WebSocket
+// Rute khusus untuk menangani koneksi WebSocket
 app.get('/ws', (c) => {
   // Cari header "Upgrade: websocket".
   const upgradeHeader = c.req.header('Upgrade');
@@ -93,8 +93,6 @@ app.get('/:token', handleTokenClaim);
 app.get('*', (c) => {
     return c.env.ASSETS.fetch(c.req.raw);
 });
-
-/
 
 // --- Ekspor Worker ---
 export default {
