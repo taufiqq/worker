@@ -1,50 +1,39 @@
-// File: src/durable-objects/websocket.do.js
+// File: src/durable-objects/websocket.do.js (CARA YANG BENAR)
 
-/**
- * WebSocketDO mengelola koneksi WebSocket untuk satu sesi WebRTC.
- * Setiap sesi (ditentukan oleh sessionId/token) akan mendapatkan instance DO ini.
- * Kata kunci 'export' di depan 'class' sangat penting agar bisa diimpor di file lain.
- */
-export class WebSocketDO {
-    constructor(state) {
-        this.state = state;
-        // Menyimpan semua koneksi WebSocket yang aktif untuk sesi ini.
+// 1. Impor kelas dasar DurableObject dari runtime.
+import { DurableObject } from "cloudflare:workers";
+
+// 2. Gunakan "extends" untuk mewarisi fungsionalitas DO.
+export class WebSocketDO extends DurableObject {
+    // Properti state tidak perlu didefinisikan ulang, ia ada di 'this.ctx'.
+    sockets;
+
+    // 3. Constructor HARUS menerima ctx dan env, lalu memanggil super().
+    constructor(ctx, env) {
+        super(ctx, env); // WAJIB memanggil constructor kelas induk.
         this.sockets = new Set();
     }
 
-    /**
-     * Metode ini dipanggil saat ada permintaan HTTP ke Durable Object.
-     * Kita hanya menangani permintaan upgrade ke WebSocket.
-     */
+    // Metode fetch dan lainnya tetap sama.
     async fetch(request) {
         const upgradeHeader = request.headers.get('Upgrade');
         if (!upgradeHeader || upgradeHeader !== 'websocket') {
             return new Response('Expected Upgrade: websocket', { status: 426 });
         }
-
-        // Membuat pasangan WebSocket.
         const [client, server] = Object.values(new WebSocketPair());
         this.handleSession(server);
-
-        // Mengembalikan respons "Switching Protocols" dengan WebSocket sisi klien.
         return new Response(null, {
             status: 101,
             webSocket: client,
         });
     }
 
-    /**
-     * Menangani siklus hidup satu koneksi WebSocket.
-     * @param {WebSocket} socket - Sisi server dari koneksi WebSocket.
-     */
     handleSession(socket) {
         socket.accept();
         this.sockets.add(socket);
-
         socket.addEventListener('message', event => {
             this.broadcast(socket, event.data);
         });
-
         const closeOrErrorHandler = () => {
             this.sockets.delete(socket);
         };
@@ -52,16 +41,12 @@ export class WebSocketDO {
         socket.addEventListener('error', closeOrErrorHandler);
     }
 
-    /**
-     * Menyiarkan pesan ke semua klien yang terhubung KECUALI pengirimnya.
-     */
     broadcast(sender, message) {
         for (const socket of this.sockets) {
             if (socket !== sender && socket.readyState === WebSocket.OPEN) {
                 try {
                     socket.send(message);
                 } catch (error) {
-                    // Hapus socket yang bermasalah agar tidak dicoba lagi.
                     this.sockets.delete(socket);
                 }
             }
