@@ -1,47 +1,89 @@
 {
-  "wallTime": 91,
+  "wallTime": 59,
   "cpuTime": 1,
   "truncated": false,
-  "executionModel": "stateless",
+  "executionModel": "durableObject",
   "outcome": "ok",
   "scriptVersion": {
-    "id": "d6bbc75f-1336-409f-81fd-8350d6d33c7b"
+    "id": "8bda3ca5-eaa8-4a1e-bdcd-a195b742500c"
   },
+  "entrypoint": "WebSocketDO",
   "scriptName": "m",
   "diagnosticsChannelEvents": [],
   "exceptions": [],
-  "logs": [],
-  "eventTimestamp": 1754897203353,
+  "logs": [
+    {
+      "message": [
+        "[DO undefined] Menerima fetch untuk: /ws/1"
+      ],
+      "level": "log",
+      "timestamp": 1754897725921
+    },
+    {
+      "message": [
+        "[DO undefined] Menangani upgrade WebSocket..."
+      ],
+      "level": "log",
+      "timestamp": 1754897725921
+    },
+    {
+      "message": [
+        "[DO undefined] Token dari klien: 53dc56c1..."
+      ],
+      "level": "log",
+      "timestamp": 1754897725921
+    },
+    {
+      "message": [
+        "[DO undefined] Secret dari storage: null"
+      ],
+      "level": "log",
+      "timestamp": 1754897725921
+    },
+    {
+      "message": [
+        "[DO undefined] AUTH_GAGAL: Token viewer tidak valid atau tidak cocok dengan id_mobil."
+      ],
+      "level": "log",
+      "timestamp": 1754897725979
+    },
+    {
+      "message": [
+        "[DO undefined] AUTH_FINAL_GAGAL: Tidak ada peran yang valid untuk token 53dc56c1... Menolak koneksi."
+      ],
+      "level": "error",
+      "timestamp": 1754897725979
+    }
+  ],
+  "eventTimestamp": 1754897725921,
   "event": {
     "request": {
-      "url": "https://m.ahmadtaufiq096.workers.dev/REDACTED",
+      "url": "https://m.ahmadtaufiq096.workers.dev/ws/1?auth=REDACTED",
       "method": "GET",
       "headers": {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "accept-encoding": "gzip, br",
         "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-        "cache-control": "max-age=0",
+        "cache-control": "no-cache",
         "cf-connecting-ip": "180.254.97.71",
         "cf-ipcountry": "ID",
-        "cf-ray": "96d601a0cc54135a",
+        "cf-ray": "96d60e62ad29406e",
         "cf-visitor": "{\"scheme\":\"https\"}",
-        "connection": "Keep-Alive",
+        "connection": "Upgrade",
         "host": "m.ahmadtaufiq096.workers.dev",
-        "sec-ch-ua": "\"Google Chrome\";v=\"111\", \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"111\"",
-        "sec-ch-ua-mobile": "?1",
-        "sec-ch-ua-platform": "\"Android\"",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "none",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1",
+        "origin": "https://m.ahmadtaufiq096.workers.dev",
+        "pragma": "no-cache",
+        "sec-websocket-extensions": "permessage-deflate; client_max_window_bits",
+        "sec-websocket-key": "REDACTED",
+        "sec-websocket-version": "13",
+        "upgrade": "websocket",
         "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Mobile Safari/537.36",
         "x-forwarded-proto": "https",
         "x-real-ip": "180.254.97.71"
       },
       "cf": {
+        "clientTcpRtt": 34,
         "requestHeaderNames": {},
-        "httpProtocol": "HTTP/3",
+        "httpProtocol": "HTTP/1.1",
         "tlsCipher": "AEAD-AES128-GCM-SHA256",
         "continent": "AS",
         "asn": 7713,
@@ -50,7 +92,7 @@
         "country": "ID",
         "isEUCountry": false,
         "region": "Yogyakarta",
-        "tlsClientCiphersSha1": "",
+        "tlsClientCiphersSha1": "omXii3/A8TcEoK4v8ABTAazY/ao=",
         "tlsClientAuth": {
           "certIssuerDNLegacy": "",
           "certIssuerSKI": "",
@@ -70,8 +112,14 @@
           "certIssuerDNRFC2253": "",
           "certFingerprintSHA1": ""
         },
-        "tlsClientRandom": "GApxg30wooEjnidQ8fIKKaRxUy7CizjfCboVGKCU+Hg=",
-        "tlsClientHelloLength": "527",
+        "tlsClientRandom": "CvIPITXYDD3mXVfkIFT/L0mYKnZHUMA6MVXNF2OgPTA=",
+        "tlsExportedAuthenticator": {
+          "clientFinished": "067244dd48149e51d56ba7c8d0547f71e6763ebb7bb91843ee775dcd8bb4d2d4",
+          "clientHandshake": "49f06a0957d7335a1cb1f7a30e9b9d00a1269a5d5306bbca0ef6fffe4c0fd0ed",
+          "serverHandshake": "2f033fa3c502bd4f1e2deb80767d42003eec5ff321bb04821a592b4cbde6ebbd",
+          "serverFinished": "6e5d6532816c4c1def947252413fa0bbb834367376495856aa086f7c470ca223"
+        },
+        "tlsClientHelloLength": "553",
         "colo": "SIN",
         "timezone": "Asia/Jakarta",
         "longitude": "110.36472",
@@ -83,13 +131,13 @@
         "tlsVersion": "TLSv1.3",
         "regionCode": "YO",
         "asOrganization": "PT TELKOM INDONESIA",
-        "tlsClientExtensionsSha1Le": "",
-        "tlsClientExtensionsSha1": "4Lyg95NJkqltTbPmHbg7UvzWhgM="
+        "tlsClientExtensionsSha1Le": "0Io9dVMW2v0hIgtk1falN+OPW+U=",
+        "tlsClientExtensionsSha1": "0lINlay6eagbwiw7/eDlcMQKAII="
       }
     },
     "response": {
-      "status": 200
+      "status": 403
     }
   },
-  "id": 0
+  "id": 1
 }

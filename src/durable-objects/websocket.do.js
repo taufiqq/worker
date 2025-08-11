@@ -11,6 +11,7 @@ export class WebSocketDO extends DurableObject {
     constructor(ctx, env) {
         super(ctx, env);
         this.idMobil = this.ctx.id.name;
+        console.log(`--- DO DIBUAT DENGAN NAMA: ${this.idMobil} ---`); // Tambahkan log ini
     }
 
     async fetch(request) {
