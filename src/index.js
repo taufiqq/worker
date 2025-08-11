@@ -2,19 +2,22 @@
 
 import { Hono } from 'hono';
 
-// IMPOR SEMUA KOMPONEN YANG DIPERLUKAN
+// IMPOR KELAS DURABLE OBJECT (SANGAT PENTING!)
 import { WebSocketDO } from './durable-objects/websocket.do.js';
+
+// IMPOR SEMUA HANDLER RUTE
 import { adminAuth } from './middleware/adminAuth.js';
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
 import { handleTokenClaim } from './routes/token.js';
 import { handleVideoStreamPage } from './routes/video.js';
+import { handleWebSocketUpgrade } from './routes/websocket.js'; // <- IMPOR HANDLER BARU
 
 // Inisialisasi aplikasi Hono
 const app = new Hono();
 
 // ==========================================================
-// DEFINISI RUTE
+// DEFINISI RUTE (SEKARANG LEBIH RAPI)
 // ==========================================================
 
 // Rute Admin Panel
@@ -26,24 +29,8 @@ app.route('/api/admin', adminApiRoutes);
 // Rute untuk menyajikan halaman streamer
 app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage);
 
-// RUTE BARU: Menangani Upgrade WebSocket
-// Klien akan terhubung ke wss://domain-anda.com/ws/SESSION_ID
-app.get('/ws/:sessionId', c => {
-    const sessionId = c.req.param('sessionId');
-
-    // Validasi sederhana untuk mencegah ID yang tidak valid
-    if (!sessionId || sessionId.length < 10) {
-      return new Response("Invalid Session ID format", { status: 400 });
-    }
-
-    // Dapatkan ID unik untuk Durable Object dari nama sesi.
-    const doId = c.env.WEBSOCKET_DO.idFromName(sessionId);
-    // Dapatkan "stub" atau perwakilan dari Durable Object tersebut.
-    const doStub = c.env.WEBSOCKET_DO.get(doId);
-
-    // Teruskan permintaan ke Durable Object untuk di-upgrade menjadi koneksi WebSocket.
-    return doStub.fetch(c.req.raw);
-});
+// RUTE WEBSOCKET: Menggunakan handler yang sudah diimpor
+app.get('/ws/:sessionId', handleWebSocketUpgrade);
 
 // Rute untuk klaim token oleh pengguna
 app.get('/:token', handleTokenClaim);
@@ -54,14 +41,25 @@ app.get('*', (c) => {
 });
 
 // ==========================================================
-// EKSPOR UTAMA (PALING PENTING!)
+// EKSPOR UTAMA (PALING PENTING DAN SUDAH DIPERBAIKI)
 // ==========================================================
-export default {
-  async fetch(request, env, ctx) {
-    // Panggil handler Hono di dalam fungsi fetch yang standar
-    return app.fetch(request, env, ctx);
-  },
 
-  // Ekspor Durable Object tetap sama
+export default {
+  /**
+   * Handler fetch utama untuk semua permintaan HTTP.
+   * Kita membungkus app.fetch dalam fungsi eksplisit agar struktur ekspor jelas.
+   * @param {Request} request
+   * @param {Env} env
+   * @param {ExecutionContext} ctx
+   * @returns {Promise<Response>}
+   */
+  fetch: (request, env, ctx) => app.fetch(request, env, ctx),
+
+  /**
+   * Ekspor kelas Durable Object.
+   * Nama properti ini (`WebSocketDO`) HARUS SAMA PERSIS dengan `class_name`
+   * yang Anda definisikan di file `wrangler.toml`. Ini memberitahu runtime Cloudflare
+   * kelas mana yang harus digunakan saat membuat instance DO.
+   */
   WebSocketDO: WebSocketDO,
 };
