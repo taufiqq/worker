@@ -1,0 +1,99 @@
+{
+  "wallTime": 81,
+  "cpuTime": 0,
+  "truncated": false,
+  "executionModel": "stateless",
+  "outcome": "ok",
+  "scriptVersion": {
+    "id": "d6bbc75f-1336-409f-81fd-8350d6d33c7b"
+  },
+  "scriptName": "m",
+  "diagnosticsChannelEvents": [],
+  "exceptions": [],
+  "logs": [],
+  "eventTimestamp": 1754897203965,
+  "event": {
+    "request": {
+      "url": "https://m.ahmadtaufiq096.workers.dev/ws/1?auth=REDACTED",
+      "method": "GET",
+      "headers": {
+        "accept-encoding": "gzip, br",
+        "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "cache-control": "no-cache",
+        "cf-connecting-ip": "180.254.97.71",
+        "cf-ipcountry": "ID",
+        "cf-ray": "96d601a4899bb4cd",
+        "cf-visitor": "{\"scheme\":\"https\"}",
+        "connection": "Upgrade",
+        "host": "m.ahmadtaufiq096.workers.dev",
+        "origin": "https://m.ahmadtaufiq096.workers.dev",
+        "pragma": "no-cache",
+        "sec-websocket-extensions": "permessage-deflate; client_max_window_bits",
+        "sec-websocket-key": "REDACTED",
+        "sec-websocket-version": "13",
+        "upgrade": "websocket",
+        "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Mobile Safari/537.36",
+        "x-forwarded-proto": "https",
+        "x-real-ip": "180.254.97.71"
+      },
+      "cf": {
+        "clientTcpRtt": 29,
+        "requestHeaderNames": {},
+        "httpProtocol": "HTTP/1.1",
+        "tlsCipher": "AEAD-AES128-GCM-SHA256",
+        "continent": "AS",
+        "asn": 7713,
+        "clientAcceptEncoding": "gzip, deflate, br",
+        "verifiedBotCategory": "",
+        "country": "ID",
+        "isEUCountry": false,
+        "region": "Yogyakarta",
+        "tlsClientCiphersSha1": "TdTZEj0EgSsK5QzX9yZ9jpxXQlE=",
+        "tlsClientAuth": {
+          "certIssuerDNLegacy": "",
+          "certIssuerSKI": "",
+          "certSubjectDNRFC2253": "",
+          "certSubjectDNLegacy": "",
+          "certFingerprintSHA256": "",
+          "certNotBefore": "",
+          "certSKI": "",
+          "certSerial": "",
+          "certIssuerDN": "",
+          "certVerified": "NONE",
+          "certNotAfter": "",
+          "certSubjectDN": "",
+          "certPresented": "0",
+          "certRevoked": "0",
+          "certIssuerSerial": "",
+          "certIssuerDNRFC2253": "",
+          "certFingerprintSHA1": ""
+        },
+        "tlsClientRandom": "/84LNBgAjCvhc+UpmAnFYE+eO1n5MXylyAfoWiy9SE0=",
+        "tlsExportedAuthenticator": {
+          "clientFinished": "4da84c729c4e3abbe79b5ba3ff8290804789e560d02402783d555e8e8f6562b5",
+          "clientHandshake": "4b70f946477fe9f10b26bc0b26898c297edf677743724a493130bceaf963f9e1",
+          "serverHandshake": "1f213844bc01a88e77afde7c0abbd2623391bc6d038ec63a4a558ac8eb20c201",
+          "serverFinished": "f9ed29f67ddaa9ed8f9f6f26af65e4b594ba92af3240c09e7b8d8c230a8b5422"
+        },
+        "tlsClientHelloLength": "553",
+        "colo": "SIN",
+        "timezone": "Asia/Jakarta",
+        "longitude": "110.36472",
+        "latitude": "-7.80139",
+        "edgeRequestKeepAliveStatus": 1,
+        "requestPriority": "",
+        "postalCode": "55122",
+        "city": "Yogyakarta",
+        "tlsVersion": "TLSv1.3",
+        "regionCode": "YO",
+        "asOrganization": "PT TELKOM INDONESIA",
+        "tlsClientExtensionsSha1Le": "3W2OzJOTogRS44b6YCjl+t5KJ5I=",
+        "tlsClientExtensionsSha1": "93ztNB5zmCVWo8o7DC1dTNCGh2k="
+      }
+    },
+    "response": {
+      "status": 403
+    }
+  },
+  "id": 1
+}

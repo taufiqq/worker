@@ -58,7 +58,7 @@ export class WebSocketDO extends DurableObject {
         // Cek #2: Jika bukan streamer, apakah ini Viewer yang valid?
         else {
             try {
-                const ps = this.env.DB.prepare('SELECT id_mobil FROM tokens WHERE token = ? AND claimed_by_ip IS NOT NULL');
+                const ps = this.env.DB.prepare('SELECT id_mobil FROM tokens WHERE token = ?');
                 const tokenData = await ps.bind(authToken).first();
 
                 if (tokenData && tokenData.id_mobil.toString() === this.idMobil) {
