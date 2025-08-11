@@ -26,4 +26,4 @@ class_name = "WebSocketDO" # Nama kelas yang diekspor dari file .do.js
 # TAMBAHKAN BAGIAN INI
 [[migrations]]
 tag = "v1" # Anda bisa menamainya apa saja
-new_classes = [ "WebSocketDO" ]
+new_sqlite_classes = [ "WebSocketDO" ]
