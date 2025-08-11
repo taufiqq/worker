@@ -1,17 +1,68 @@
 {
-  "wallTime": 73,
-  "cpuTime": 5,
+  "wallTime": 313,
+  "cpuTime": 2,
   "truncated": false,
-  "executionModel": "stateless",
+  "executionModel": "durableObject",
   "outcome": "ok",
   "scriptVersion": {
-    "id": "8bda3ca5-eaa8-4a1e-bdcd-a195b742500c"
+    "id": "37fa0cd3-66b5-4983-a53b-f06d2a40fb59"
   },
+  "entrypoint": "WebSocketDO",
   "scriptName": "m",
   "diagnosticsChannelEvents": [],
   "exceptions": [],
-  "logs": [],
-  "eventTimestamp": 1754897725897,
+  "logs": [
+    {
+      "message": [
+        "--- DO DIBUAT DENGAN NAMA: undefined ---"
+      ],
+      "level": "log",
+      "timestamp": 1754898394299
+    },
+    {
+      "message": [
+        "[DO undefined] Menerima fetch untuk: /ws/1"
+      ],
+      "level": "log",
+      "timestamp": 1754898394299
+    },
+    {
+      "message": [
+        "[DO undefined] Menangani upgrade WebSocket..."
+      ],
+      "level": "log",
+      "timestamp": 1754898394299
+    },
+    {
+      "message": [
+        "[DO undefined] Token dari klien: 53dc56c1..."
+      ],
+      "level": "log",
+      "timestamp": 1754898394299
+    },
+    {
+      "message": [
+        "[DO undefined] Secret dari storage: null"
+      ],
+      "level": "log",
+      "timestamp": 1754898394299
+    },
+    {
+      "message": [
+        "[DO undefined] AUTH_GAGAL: Token viewer tidak valid atau tidak cocok dengan id_mobil."
+      ],
+      "level": "log",
+      "timestamp": 1754898394378
+    },
+    {
+      "message": [
+        "[DO undefined] AUTH_FINAL_GAGAL: Tidak ada peran yang valid untuk token 53dc56c1... Menolak koneksi."
+      ],
+      "level": "error",
+      "timestamp": 1754898394378
+    }
+  ],
+  "eventTimestamp": 1754898394067,
   "event": {
     "request": {
       "url": "https://m.ahmadtaufiq096.workers.dev/ws/1?auth=REDACTED",
@@ -22,7 +73,7 @@
         "cache-control": "no-cache",
         "cf-connecting-ip": "180.254.97.71",
         "cf-ipcountry": "ID",
-        "cf-ray": "96d60e62ad29406e",
+        "cf-ray": "96d61eb28eb4f3fb",
         "cf-visitor": "{\"scheme\":\"https\"}",
         "connection": "Upgrade",
         "host": "m.ahmadtaufiq096.workers.dev",
@@ -37,7 +88,7 @@
         "x-real-ip": "180.254.97.71"
       },
       "cf": {
-        "clientTcpRtt": 34,
+        "clientTcpRtt": 32,
         "requestHeaderNames": {},
         "httpProtocol": "HTTP/1.1",
         "tlsCipher": "AEAD-AES128-GCM-SHA256",
@@ -48,7 +99,7 @@
         "country": "ID",
         "isEUCountry": false,
         "region": "Yogyakarta",
-        "tlsClientCiphersSha1": "omXii3/A8TcEoK4v8ABTAazY/ao=",
+        "tlsClientCiphersSha1": "pdGcErBTDt22TM3jTvj6A2k54tY=",
         "tlsClientAuth": {
           "certIssuerDNLegacy": "",
           "certIssuerSKI": "",
@@ -68,12 +119,12 @@
           "certIssuerDNRFC2253": "",
           "certFingerprintSHA1": ""
         },
-        "tlsClientRandom": "CvIPITXYDD3mXVfkIFT/L0mYKnZHUMA6MVXNF2OgPTA=",
+        "tlsClientRandom": "ALAKgaZJySY/HO0YRO+t+fVQjDUpEypAlmzgqeeswWA=",
         "tlsExportedAuthenticator": {
-          "clientFinished": "067244dd48149e51d56ba7c8d0547f71e6763ebb7bb91843ee775dcd8bb4d2d4",
-          "clientHandshake": "49f06a0957d7335a1cb1f7a30e9b9d00a1269a5d5306bbca0ef6fffe4c0fd0ed",
-          "serverHandshake": "2f033fa3c502bd4f1e2deb80767d42003eec5ff321bb04821a592b4cbde6ebbd",
-          "serverFinished": "6e5d6532816c4c1def947252413fa0bbb834367376495856aa086f7c470ca223"
+          "clientFinished": "c9dd5d90e0fdf7be49e760ef34afaced1a2f1cbdb6f2bc43ec5afbe6a157bc68",
+          "clientHandshake": "b452c375b3d6c70579393a0a18970fcc88cf643141649ab54beeff82893e00f6",
+          "serverHandshake": "5fcaf87c4ace090450e62f6dac74079d3f88a12286d5eaebb6453c27c754a407",
+          "serverFinished": "5ebf01a64f4b12a9b4fe37f7abeffd8c82f4d2e4a156730d3920f88e60e3dcaf"
         },
         "tlsClientHelloLength": "553",
         "colo": "SIN",
@@ -87,8 +138,8 @@
         "tlsVersion": "TLSv1.3",
         "regionCode": "YO",
         "asOrganization": "PT TELKOM INDONESIA",
-        "tlsClientExtensionsSha1Le": "0Io9dVMW2v0hIgtk1falN+OPW+U=",
-        "tlsClientExtensionsSha1": "0lINlay6eagbwiw7/eDlcMQKAII="
+        "tlsClientExtensionsSha1Le": "hByaFm1YpvJGh8qrh40+ZV8cVTU=",
+        "tlsClientExtensionsSha1": "o12C2Pcc17y/cALd6e0cxqkS3SE="
       }
     },
     "response": {

@@ -1,17 +1,17 @@
 {
-  "wallTime": 61,
-  "cpuTime": 1,
+  "wallTime": 583,
+  "cpuTime": 8,
   "truncated": false,
   "executionModel": "stateless",
   "outcome": "ok",
   "scriptVersion": {
-    "id": "8bda3ca5-eaa8-4a1e-bdcd-a195b742500c"
+    "id": "37fa0cd3-66b5-4983-a53b-f06d2a40fb59"
   },
   "scriptName": "m",
   "diagnosticsChannelEvents": [],
   "exceptions": [],
   "logs": [],
-  "eventTimestamp": 1754897725488,
+  "eventTimestamp": 1754898393093,
   "event": {
     "request": {
       "url": "https://m.ahmadtaufiq096.workers.dev/REDACTED",
@@ -23,7 +23,7 @@
         "cache-control": "max-age=0",
         "cf-connecting-ip": "180.254.97.71",
         "cf-ipcountry": "ID",
-        "cf-ray": "96d60e6039cbfdab",
+        "cf-ray": "96d61eac7feca8d2",
         "cf-visitor": "{\"scheme\":\"https\"}",
         "connection": "Keep-Alive",
         "host": "m.ahmadtaufiq096.workers.dev",
@@ -70,8 +70,8 @@
           "certIssuerDNRFC2253": "",
           "certFingerprintSHA1": ""
         },
-        "tlsClientRandom": "V7k9m1i5etey75VP/RdnRvBckkfeVHtGY0RN3nTCn68=",
-        "tlsClientHelloLength": "541",
+        "tlsClientRandom": "iHiuNNhSmy4dipXIhEce0WM0vvQgInxlnIAytEj7s0k=",
+        "tlsClientHelloLength": "527",
         "colo": "SIN",
         "timezone": "Asia/Jakarta",
         "longitude": "110.36472",
@@ -84,7 +84,7 @@
         "regionCode": "YO",
         "asOrganization": "PT TELKOM INDONESIA",
         "tlsClientExtensionsSha1Le": "",
-        "tlsClientExtensionsSha1": "JHg2VwRxJ94IJQuV18xL0410/oc="
+        "tlsClientExtensionsSha1": "deHOW38VsS2fyk3ZrROtsAOhiH8="
       }
     },
     "response": {
