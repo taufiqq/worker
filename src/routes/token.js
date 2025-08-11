@@ -72,9 +72,7 @@ async function serveSuccessPage(c, credentials, token) {
             user: credentials.user,
             pass: credentials.pass,
             id: credentials.id,
-            id_mobil: credentials.id_mobil,
-            // TAMBAHKAN INI: token asli untuk otentikasi WebSocket viewer
-            authToken: token 
+            id_mobil: credentials.id_mobil
         };
         
         const injectionScript = `<script>window.MQTT_CREDENTIALS = ${JSON.stringify(injectionData)};</script>`;

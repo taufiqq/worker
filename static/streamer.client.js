@@ -16,12 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 1. Baca Session ID (id_mobil) dan Stream Secret yang disuntikkan oleh server
-    if (!window.WEBRTC_SESSION_ID || !window.WEBRTC_STREAM_SECRET) {
-        updateStatus('ERROR: Session ID atau Stream Secret tidak ditemukan. Halaman tidak dimuat dengan benar.');
-        startButton.disabled = true;
-        return;
-    }
-    const sessionId = window.WEBRTC_SESSION_ID;
+    const pathSegments = window.location.pathname.split('/');
+    const sessionId = pathSegments[pathSegments.length - 1]; // Ambil ID dari segmen URL terakhir
     const streamSecret = window.WEBRTC_STREAM_SECRET;
 
     sessionIdDisplay.textContent = sessionId;

@@ -34,7 +34,6 @@ export const handleVideoStreamPage = async (c) => {
         let html = await asset.text();
 
         const injectionScript = `<script>
-            window.WEBRTC_SESSION_ID = "${id_mobil}";
             window.WEBRTC_STREAM_SECRET = "${streamSecret}";
         </script>`;
         

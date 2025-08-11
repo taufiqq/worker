@@ -13,13 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 1. Ambil data sesi yang disuntikkan dari objek global
-    if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.id_mobil || !window.MQTT_CREDENTIALS.authToken) {
+    if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.id_mobil) {
         updateStatus("Error: Data sesi tidak lengkap. Harap akses melalui URL token yang valid.");
         return;
     }
 
     const sessionId = window.MQTT_CREDENTIALS.id_mobil;
-    const authToken = window.MQTT_CREDENTIALS.authToken;
+    const pathSegments = window.location.pathname.split('/');
+    const authToken = pathSegments[pathSegments.length - 1]; // Ambil token dari segmen URL terakhir
+
 
     const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
