@@ -2,34 +2,46 @@
 
 /**
  * Handler untuk menyajikan halaman streamer video setelah autentikasi.
- * Mengambil token berdasarkan id_mobil dan menyuntikkannya sebagai Session ID.
+ * Membuat secret untuk streamer, menyimpannya di DO, dan menyuntikkannya ke halaman.
  */
 export const handleVideoStreamPage = async (c) => {
     const { id_mobil } = c.req.param();
-    
+
     try {
-        // 1. Cari token di D1 berdasarkan id_mobil dari URL
+        // 1. Verifikasi id_mobil ada di DB (praktik yang baik)
         const ps = c.env.DB.prepare('SELECT token FROM tokens WHERE id_mobil = ? LIMIT 1');
         const result = await ps.bind(id_mobil).first();
-
-        // 2. Jika tidak ada token untuk id_mobil tersebut, kirim error 404
-        if (!result || !result.token) {
-            return c.text(`Token untuk ID Mobil ${id_mobil} tidak ditemukan di database.`, 404);
+        if (!result) {
+            return c.text(`ID Mobil ${id_mobil} tidak ditemukan di database.`, 404);
         }
 
-        const token = result.token;
+        // 2. Buat secret unik untuk sesi streaming ini
+        const streamSecret = crypto.randomUUID();
 
-        // 3. Ambil file HTML dari assets
+        // 3. Dapatkan stub DO dan kirim secret untuk disimpan
+        const doId = c.env.WEBSOCKET_DO.idFromName(id_mobil);
+        const doStub = c.env.WEBSOCKET_DO.get(doId);
+        
+        // Kirim permintaan HTTP (bukan WebSocket) ke DO untuk mengatur secret
+        // Kita menggunakan URL internal fiktif yang akan dikenali oleh DO
+        await doStub.fetch('https://webrtc.internal/_set_stream_secret', {
+            method: 'POST',
+            body: streamSecret,
+        });
+
+        // 4. Ambil file HTML dari assets
         const asset = await c.env.ASSETS.fetch(new URL('/streamer.html', c.req.url));
         if (!asset.ok) {
             return c.text('File streamer.html tidak ditemukan.', 500);
         }
         let html = await asset.text();
 
-        // 4. Buat script untuk menyuntikkan token sebagai Session ID WebRTC
-        const injectionScript = `<script>window.WEBRTC_SESSION_ID = "${token}";</script>`;
+        // 5. Suntikkan id_mobil (sebagai sessionId) DAN streamSecret
+        const injectionScript = `<script>
+            window.WEBRTC_SESSION_ID = "${id_mobil}";
+            window.WEBRTC_STREAM_SECRET = "${streamSecret}";
+        </script>`;
         
-        // 5. Suntikkan script ke dalam HTML sebelum tag </body>
         html = html.replace('</body>', `${injectionScript}</body>`);
         
         // 6. Sajikan halaman yang sudah dimodifikasi

@@ -12,14 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = `Status: ${message}`;
     };
 
-    // 1. Ambil Session ID dari URL
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const sessionId = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
-
-    if (!sessionId) {
-        updateStatus("Error: Session ID (token) tidak ditemukan di URL.");
+    // 1. Ambil data sesi yang disuntikkan dari objek global
+    if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.id_mobil || !window.MQTT_CREDENTIALS.authToken) {
+        updateStatus("Error: Data sesi tidak lengkap. Harap akses melalui URL token yang valid.");
         return;
     }
+
+    const sessionId = window.MQTT_CREDENTIALS.id_mobil;
+    const authToken = window.MQTT_CREDENTIALS.authToken;
 
     const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
@@ -30,16 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 3. Fungsi untuk membuat koneksi WebSocket
+    // 3. Fungsi untuk membuat koneksi WebSocket (dengan otentikasi)
     function setupWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+        // URL WebSocket sekarang menggunakan id_mobil dan authToken viewer
+        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}?auth=${authToken}`;
         
         updateStatus(`Mencoba terhubung ke sesi FPV: ${sessionId}`);
         ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => updateStatus('Terhubung. Menunggu sinyal dari streamer...');
-        ws.onclose = () => updateStatus('Koneksi terputus. Refresh halaman untuk mencoba lagi.');
+        ws.onopen = () => updateStatus('Terhubung. Menunggu sinyal video dari streamer...');
+        ws.onclose = (event) => updateStatus(`Koneksi terputus. Kode: ${event.code}. Refresh halaman untuk mencoba lagi.`);
         ws.onerror = (err) => updateStatus(`WebSocket Error: ${err.message || 'Tidak diketahui'}`);
 
         ws.onmessage = async (event) => {
@@ -47,7 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(`Menerima sinyal: ${signal.type}`);
 
             if (signal.type === 'offer') {
-                if (peerConnection) peerConnection.close();
+                if (peerConnection) {
+                    peerConnection.close();
+                }
                 peerConnection = new RTCPeerConnection(configuration);
 
                 peerConnection.ontrack = event => {
@@ -61,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 peerConnection.onconnectionstatechange = () => {
                     updateStatus(`Status koneksi peer: ${peerConnection.connectionState}`);
-                    statusDiv.style.display = peerConnection.connectionState === 'connected' ? 'none' : 'block';
                 };
                 
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
@@ -71,6 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } else if (signal.type === 'candidate' && peerConnection) {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
+            } else if (signal.type === 'streamer-disconnected') {
+                updateStatus('Streamer telah memutus koneksi. Menunggu untuk terhubung kembali...');
+                if (peerConnection) peerConnection.close();
+                remoteVideo.srcObject = null;
             }
         };
     }

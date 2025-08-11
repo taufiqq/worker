@@ -25,8 +25,8 @@ export const handleTokenClaim = async (c) => {
         if (data.claimed_by_ip) {
             // Cek apakah IP-nya sama (pengguna yang sama me-refresh halaman)
             if (data.claimed_by_ip === currentIp) {
-                // IP SAMA: Berikan akses lagi
-                return serveSuccessPage(c, data);
+                // IP SAMA: Berikan akses lagi, teruskan token asli ke helper
+                return serveSuccessPage(c, data, token);
             } else {
                 // IP BEDA: Token sudah diambil orang lain
                 return c.env.ASSETS.fetch(new URL('/taken.html', request.url));
@@ -43,8 +43,8 @@ export const handleTokenClaim = async (c) => {
         // Cek apakah update berhasil. Jika `meta.changes` adalah 0, berarti
         // ada proses lain yang mengklaim token ini sepersekian detik lebih dulu (race condition).
         if (success && meta.changes > 0) {
-            // Klaim berhasil!
-            return serveSuccessPage(c, data);
+            // Klaim berhasil! Teruskan token asli ke helper.
+            return serveSuccessPage(c, data, token);
         } else {
             // Gagal mengklaim (kemungkinan sudah diambil orang lain)
             return c.env.ASSETS.fetch(new URL('/taken.html', request.url));
@@ -58,20 +58,23 @@ export const handleTokenClaim = async (c) => {
 
 /**
  * Helper untuk menyajikan halaman sukses dengan menyuntikkan kredensial.
- * @param {Context} c - Konteks Hono
+ * @param {import('hono').Context} c - Konteks Hono
  * @param {object} credentials - Objek berisi { id, user, pass, id_mobil }
+ * @param {string} token - Token asli yang digunakan pengguna untuk mengakses halaman ini
  */
-async function serveSuccessPage(c, credentials) {
+async function serveSuccessPage(c, credentials, token) {
     try {
         const asset = await c.env.ASSETS.fetch(new URL('/C.html', c.req.url));
         let html = await asset.text();
         
-        // Suntikkan semua data yang diperlukan, termasuk id_mobil
+        // Suntikkan semua data yang diperlukan untuk MQTT dan WebRTC
         const injectionData = {
             user: credentials.user,
             pass: credentials.pass,
             id: credentials.id,
-            id_mobil: credentials.id_mobil 
+            id_mobil: credentials.id_mobil,
+            // TAMBAHKAN INI: token asli untuk otentikasi WebSocket viewer
+            authToken: token 
         };
         
         const injectionScript = `<script>window.MQTT_CREDENTIALS = ${JSON.stringify(injectionData)};</script>`;

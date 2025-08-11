@@ -15,12 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = `Status: ${message}`;
     };
 
-    // 1. Baca Session ID yang disuntikkan oleh server
-    if (!window.WEBRTC_SESSION_ID) {
-        updateStatus('ERROR: Session ID tidak ditemukan.');
+    // 1. Baca Session ID (id_mobil) dan Stream Secret yang disuntikkan oleh server
+    if (!window.WEBRTC_SESSION_ID || !window.WEBRTC_STREAM_SECRET) {
+        updateStatus('ERROR: Session ID atau Stream Secret tidak ditemukan. Halaman tidak dimuat dengan benar.');
+        startButton.disabled = true;
         return;
     }
     const sessionId = window.WEBRTC_SESSION_ID;
+    const streamSecret = window.WEBRTC_STREAM_SECRET;
+
     sessionIdDisplay.textContent = sessionId;
     startButton.disabled = false;
 
@@ -33,10 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 3. Fungsi untuk membuat koneksi WebSocket
+    // 3. Fungsi untuk membuat koneksi WebSocket (dengan otentikasi)
     function setupWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+        // URL WebSocket sekarang menyertakan streamSecret sebagai parameter 'auth'
+        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}?auth=${streamSecret}`;
 
         updateStatus(`Menghubungkan ke ${wsUrl}`);
         ws = new WebSocket(wsUrl);
@@ -59,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        ws.onclose = () => updateStatus('Koneksi WebSocket ditutup.');
+        ws.onclose = (event) => updateStatus(`Koneksi WebSocket ditutup. Kode: ${event.code}, Alasan: ${event.reason || 'Tidak diketahui'}`);
         ws.onerror = (err) => updateStatus(`WebSocket Error: ${err.message || 'Tidak diketahui'}`);
     }
 
@@ -87,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             peerConnection.onconnectionstatechange = () => updateStatus(`Status koneksi peer: ${peerConnection.connectionState}`);
 
-            setupWebSocket(); // Mulai koneksi WebSocket
+            setupWebSocket(); // Mulai koneksi WebSocket setelah peer disiapkan
         } catch (error) {
             updateStatus(`Error: ${error.message}`);
             startButton.disabled = false;
