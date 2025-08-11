@@ -1,6 +1,9 @@
 // File: src/durable-objects/websocket.do.js
 
 import { DurableObject } from "cloudflare:workers";
+// File: src/durable-objects/websocket.do.js (VERSI DEBUGGING)
+
+import { DurableObject } from "cloudflare:workers";
 
 export class WebSocketDO extends DurableObject {
     streamer = null;
@@ -10,71 +13,95 @@ export class WebSocketDO extends DurableObject {
 
     constructor(ctx, env) {
         super(ctx, env);
-        // Mendapatkan id_mobil dari nama DO itu sendiri
-        this.idMobil = ctx.id.name; 
+        this.idMobil = ctx.id.name;
     }
 
     async fetch(request) {
         const url = new URL(request.url);
+        console.log(`[DO ${this.idMobil}] Received fetch request for: ${url.pathname}`);
 
-        // Rute internal untuk mengatur secret dari streamer
+        // RUTE 1: Mengatur secret
         if (url.pathname === '/_set_stream_secret') {
+            console.log(`[DO ${this.idMobil}] Handling '/_set_stream_secret'`);
             if (request.method !== 'POST') {
                 return new Response('Method Not Allowed', { status: 405 });
             }
             const streamSecret = await request.text();
             if (!streamSecret) {
+                console.error(`[DO ${this.idMobil}] Attempted to set an empty secret.`);
                 return new Response('Secret cannot be empty', { status: 400 });
             }
-            // Simpan secret ke storage yang persisten untuk DO ini
             await this.ctx.storage.put('stream_secret', streamSecret);
+            console.log(`[DO ${this.idMobil}] SUCCESS: Stream secret has been stored.`);
             return new Response('Secret stored', { status: 200 });
         }
         
-        // Logika untuk upgrade ke WebSocket
+        // RUTE 2: Upgrade ke WebSocket
         const upgradeHeader = request.headers.get('Upgrade');
         if (!upgradeHeader || upgradeHeader !== 'websocket') {
             return new Response('Expected Upgrade: websocket', { status: 426 });
         }
 
-        // --- GERBANG OTENTIKASI ---
+        console.log(`[DO ${this.idMobil}] Handling WebSocket upgrade request...`);
+
+        // --- GERBANG OTENTIKASI WEBSOCKET ---
         const authToken = url.searchParams.get('auth');
         if (!authToken) {
-            return new Response('Auth token is required', { status: 401 });
+            console.error(`[DO ${this.idMobil}] AUTH_FAIL: Auth token is missing from URL.`);
+            return new Response('Auth token is required via ?auth=... parameter', { status: 401 });
         }
+        console.log(`[DO ${this.idMobil}] Auth token from URL: ${authToken.substring(0, 8)}...`);
 
         let role = null;
         
-        // Cek apakah ini streamer
         const storedSecret = await this.ctx.storage.get('stream_secret');
+        console.log(`[DO ${this.idMobil}] Secret from storage: ${storedSecret ? storedSecret.substring(0, 8) + '...' : 'NOT FOUND'}`);
+        
+        // Cek #1: Apakah ini streamer?
         if (storedSecret && authToken === storedSecret) {
             role = 'streamer';
+            console.log(`[DO ${this.idMobil}] AUTH_SUCCESS: Role determined as 'streamer'.`);
         } else {
-            // Jika bukan streamer, cek apakah ini viewer yang valid
-            const ps = this.env.DB.prepare('SELECT id_mobil FROM tokens WHERE token = ? AND claimed_by_ip IS NOT NULL');
-            const tokenData = await ps.bind(authToken).first();
+            console.log(`[DO ${this.idMobil}] Token did not match streamer secret. Checking if it's a viewer token...`);
+            // Cek #2: Jika bukan streamer, cek apakah ini viewer yang valid
+            try {
+                const ps = this.env.DB.prepare('SELECT id_mobil FROM tokens WHERE token = ? AND claimed_by_ip IS NOT NULL');
+                const tokenData = await ps.bind(authToken).first();
 
-            // Token valid JIKA ada di DB, sudah diklaim, DAN id_mobil-nya cocok dengan DO ini.
-            if (tokenData && tokenData.id_mobil === this.idMobil) {
-                role = 'viewer';
+                if (tokenData) {
+                    console.log(`[DO ${this.idMobil}] Found token in DB for mobil: ${tokenData.id_mobil}. This DO is for mobil: ${this.idMobil}.`);
+                    if (tokenData.id_mobil === this.idMobil) {
+                        role = 'viewer';
+                        console.log(`[DO ${this.idMobil}] AUTH_SUCCESS: Role determined as 'viewer'.`);
+                    } else {
+                        console.error(`[DO ${this.idMobil}] AUTH_FAIL: Token is for a different car.`);
+                    }
+                } else {
+                    console.log(`[DO ${this.idMobil}] Token not found or not claimed in DB.`);
+                }
+            } catch (dbError) {
+                console.error(`[DO ${this.idMobil}] CRITICAL_ERROR: D1 database query failed.`, dbError);
+                return new Response('Internal Server Error (DB)', { status: 500 });
             }
         }
 
         if (!role) {
-            // Jika tidak ada peran yang cocok, tolak koneksi
+            console.error(`[DO ${this.idMobil}] AUTH_FAIL: No valid role could be assigned. Denying connection.`);
             return new Response('Invalid or expired auth token', { status: 403 });
         }
         // --- AKHIR GERBANG OTENTIKASI ---
 
+        console.log(`[DO ${this.idMobil}] Proceeding with WebSocket handshake for role: ${role}.`);
         const [client, server] = Object.values(new WebSocketPair());
         this.handleSession(server, role);
 
-        return new Response(null, {
-            status: 101,
-            webSocket: client,
-        });
+        return new Response(null, { status: 101, webSocket: client });
     }
 
+    // Metode handleSession dan handleMessage tidak perlu diubah, biarkan seperti sebelumnya.
+    // ...
+    // Salin metode handleSession dan handleMessage dari versi sebelumnya ke sini.
+    
     handleSession(socket, role) {
         socket.accept();
         console.log(`Connection accepted with role: ${role}`);
