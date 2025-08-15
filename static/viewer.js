@@ -31,8 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const { id_mobil } = window.MQTT_CREDENTIALS;
         updateStatus(`Menghubungkan ke stream video untuk mobil ID: ${id_mobil}`);
 
+        const token = window.location.pathname.substring(1);
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}`;
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}?token=${token}`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {

@@ -29,12 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. Dapatkan id_mobil dari URL
     const pathParts = window.location.pathname.split('/');
     const id_mobil = pathParts[pathParts.length - 1];
-    
-    if (!window.ADMIN_CREDENTIALS || !window.ADMIN_CREDENTIALS.user) {
-        updateStatus("Error: Kredensial admin tidak ditemukan. Gagal memulai koneksi.");
-        return;
-    }
-
 
     if (!id_mobil) {
         updateStatus("Error: id_mobil tidak ditemukan di URL.");
@@ -55,10 +49,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // 3. Hubungkan ke WebSocket Server (Durable Object)
-    const token = window.location.pathname.substring(1);
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}?user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`;
-    
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}`;
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {

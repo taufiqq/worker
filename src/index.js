@@ -12,36 +12,14 @@ const app = new Hono();
 // --- RUTE WEBRTC DENGAN AUTENTIKASI ---
 
 // 1. Proteksi halaman streamer dengan Basic Auth
-app.get('/video/:id_mobil', adminAuth, async (c) => {
-    // Ambil kredensial dari header Basic Auth
-    const authHeader = c.req.header('Authorization');
-    const decodedCreds = atob(authHeader.substring(6));
-    const [user, pass] = decodedCreds.split(':');
-
-    // Ambil file HTML aset
-    const asset = await c.env.ASSETS.fetch(new URL('/streamer.html', c.req.url));
-    
-    // Siapkan data untuk disuntikkan
-    const injectionData = { user, pass };
-    const injectionScript = `<script>window.ADMIN_CREDENTIALS = ${JSON.stringify(injectionData)};</script>`;
-
-    // Gunakan HTMLRewriter untuk menyuntikkan skrip sebelum tag penutup </body>
-    return new HTMLRewriter()
-      .on('body', {
-        element: (element) => {
-          element.append(injectionScript, { html: true });
-        },
-      })
-      .transform(asset);
+app.get('/video/:id_mobil', adminAuth, (c) => {
+    return c.env.ASSETS.fetch(new URL('/streamer.html', c.req.url));
 });
 
 // 2. Rute "Penjaga Gerbang" WebSocket yang cerdas
 app.get('/api/video/ws/:id_mobil', async (c) => {
     const id_mobil = c.req.param('id_mobil');
     const token = c.req.query('token');
-    const adminUser = c.req.query('user');
-    const adminPass = c.req.query('pass');
-    
     const authHeader = c.req.header('Authorization');
     
     let role = null;
@@ -61,15 +39,21 @@ app.get('/api/video/ws/:id_mobil', async (c) => {
         }
     } 
     // --- Cek Autentikasi Streamer (berdasarkan Basic Auth) ---
-    else if (adminUser && adminPass) {
+    else if (authHeader && authHeader.startsWith('Basic ')) {
         try {
-            const adminData = await c.env.ADMIN.get(`admin:${adminUser}`, 'json');
-            if (adminData && adminData.pass === adminPass) {
+            const decodedCreds = atob(authHeader.substring(6));
+            const [user, pass] = decodedCreds.split(':');
+            const adminData = await c.env.ADMIN.get(`admin:${user}`, 'json');
+
+            if (adminData && adminData.pass === pass) {
                 isValid = true;
                 role = 'streamer';
             }
-        } catch(e) { console.error("Error validasi Basic Auth streamer:", e); }
+        } catch(e) {
+             console.error("Error validasi Basic Auth streamer:", e);
+        }
     }
+
     // Jika autentikasi gagal, tolak koneksi
     if (!isValid) {
         return new Response('Autentikasi WebSocket gagal.', { status: 401 });
@@ -89,7 +73,7 @@ app.get('/api/video/ws/:id_mobil', async (c) => {
 
 // --- RUTE LAMA ANDA ---
 app.get('/admin', adminAuth, handleAdminPage);
-app.route('/api/admin', adminApiRoutes);
+app.route('/api/admin', adminApiApiRoutes);
 app.get('/:token', handleTokenClaim);
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
