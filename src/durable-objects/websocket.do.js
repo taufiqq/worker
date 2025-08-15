@@ -1,13 +1,15 @@
-// File: src/durable-objects/websocket.do.js (VERSI 1-ke-1 YANG JAUH LEBIH STABIL)
+// File: src/durable-objects/websocket.do.js (VERSI DENGAN BUFFER CANDIDATE)
 
 import { DurableObject } from "cloudflare:workers";
 
 export class WebSocketDO extends DurableObject {
-    // --- PERUBAHAN 1: Ganti `viewers` dengan `viewer` tunggal ---
     streamer = null;
     viewer = null; 
     latestOffer = null;
     
+    // --- PERUBAHAN 1: Tambahkan buffer untuk menyimpan candidate dari streamer ---
+    streamerCandidates = [];
+
     constructor(ctx, env) {
         super(ctx, env);
     }
@@ -65,26 +67,29 @@ export class WebSocketDO extends DurableObject {
         console.log(`[DO ${idMobil}] Koneksi diterima. Peran: ${role}`);
 
         if (role === 'streamer') {
-            // Jika ada streamer lama, putuskan koneksinya.
             if (this.streamer) this.streamer.close(1000, 'Streamer baru terhubung');
             this.streamer = socket;
             
-            // Beri tahu viewer (jika ada) bahwa streamer terputus (untuk reset)
-            if (this.viewer) this.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
+            // --- PERUBAHAN 2: Reset state saat streamer baru terhubung ---
+            this.latestOffer = null;
+            this.streamerCandidates = [];
 
-            // Hapus secret setelah digunakan
+            if (this.viewer) this.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
             this.ctx.storage.delete('stream_secret');
 
         } else { // role === 'viewer'
-            // --- PERUBAHAN 2: Logika untuk viewer tunggal ---
-            // Jika ada viewer lama, putuskan koneksinya. Hanya satu yang boleh nonton.
             if (this.viewer) this.viewer.close(1000, 'Viewer baru terhubung');
             this.viewer = socket;
 
-            // Jika streamer sudah mengirim offer, langsung kirimkan ke viewer baru ini.
+            // --- PERUBAHAN 3: Kirim offer DAN semua candidate yang sudah dibuffer ---
             if (this.latestOffer) {
                 console.log(`[DO ${idMobil}] Mengirimkan offer yang sudah ada ke viewer baru.`);
                 socket.send(JSON.stringify({ type: 'offer', data: this.latestOffer }));
+                
+                console.log(`[DO ${idMobil}] Mengirimkan ${this.streamerCandidates.length} candidate yang dibuffer.`);
+                for (const candidate of this.streamerCandidates) {
+                    socket.send(JSON.stringify({ type: 'candidate', data: candidate }));
+                }
             }
         }
 
@@ -94,7 +99,8 @@ export class WebSocketDO extends DurableObject {
             if (role === 'streamer' && socket === this.streamer) {
                 this.streamer = null; 
                 this.latestOffer = null;
-                // Beri tahu viewer bahwa streamer telah terputus
+                // --- PERUBAHAN 5: Kosongkan buffer candidate saat streamer disconnect ---
+                this.streamerCandidates = [];
                 if (this.viewer) {
                     this.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
                 }
@@ -108,18 +114,31 @@ export class WebSocketDO extends DurableObject {
     }
     
     handleMessage(senderSocket, role, message, idMobil) {
-        // --- PERUBAHAN 3: Logika pengiriman pesan yang jauh lebih sederhana ---
         try {
             const signal = JSON.parse(message);
             
             if (role === 'streamer') {
-                // Pesan dari Streamer (offer, candidate) HANYA untuk Viewer
                 if (signal.type === 'offer') {
                     this.latestOffer = signal.data;
                 }
+                
+                // --- PERUBAHAN 4: Logika inti - buffer atau kirim candidate ---
+                if (signal.type === 'candidate') {
+                    if (this.viewer) {
+                        // Jika viewer sudah ada, langsung kirim
+                        this.viewer.send(message);
+                    } else {
+                        // Jika viewer belum ada, simpan di buffer
+                        this.streamerCandidates.push(signal.data);
+                    }
+                    return; // Hentikan eksekusi di sini untuk candidate
+                }
+
+                // Untuk pesan lain (seperti offer), kirim jika viewer ada
                 if (this.viewer) {
                     this.viewer.send(message);
                 }
+
             } else if (role === 'viewer') {
                 // Pesan dari Viewer (answer, candidate) HANYA untuk Streamer
                 if (this.streamer) {
