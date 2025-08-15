@@ -1,59 +1,43 @@
-// --- START OF FILE public/simple-receiver.js ---
 document.addEventListener('DOMContentLoaded', () => {
-    const remoteVideo = document.getElementById('remoteVideo');
-    const statusDiv = document.getElementById('status');
-    const sessionIdDisplay = document.getElementById('sessionId');
+    // ... (kode untuk elemen HTML dan status tetap sama) ...
 
-    const sessionId = window.location.pathname.split('/')[1];
-    sessionIdDisplay.textContent = sessionId;
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${window.location.host}/ws-simple/${sessionId}?role=receiver`;
+    const ws = new WebSocket(wsUrl);
 
-    let ws;
-    let peerConnection;
-    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    ws.onopen = () => {
+        updateStatus('WebSocket Connected. Waiting for signal...');
+        
+        // --- INTI DARI SIMPLE-PEER ---
+        const peer = new SimplePeer({
+            initiator: false,
+            trickle: false
+        });
 
-    const updateStatus = msg => {
-        console.log(msg);
-        statusDiv.textContent = `Status: ${msg}`;
-    };
-
-    function connectWebSocket() {
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${proto}//${window.location.host}/ws-simple/${sessionId}?role=receiver`;
-        updateStatus(`Connecting to WebSocket at ${wsUrl}`);
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => updateStatus('WebSocket Connected. Waiting for offer...');
-        ws.onclose = () => updateStatus('WebSocket Disconnected.');
-        ws.onerror = (err) => updateStatus(`WebSocket Error: ${err.message}`);
-
-        ws.onmessage = async (event) => {
-            const signal = JSON.parse(event.data);
-            updateStatus(`Signal received: ${signal.type}`);
-
-            if (signal.type === 'offer') {
-                peerConnection = new RTCPeerConnection(configuration);
-                
-                peerConnection.ontrack = (event) => {
-                    updateStatus('Video track received!');
-                    remoteVideo.srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = (e) => {
-                    if (e.candidate) {
-                        ws.send(JSON.stringify({ type: 'candidate', data: e.candidate }));
-                    }
-                };
-                
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                ws.send(JSON.stringify({ type: 'answer', data: answer }));
-                updateStatus('Answer sent.');
-
-            } else if (signal.type === 'candidate' && peerConnection) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
-            }
+        // Terima sinyal dari sender
+        ws.onmessage = event => {
+            updateStatus('Received signal data...');
+            peer.signal(JSON.parse(event.data));
         };
-    }
-    connectWebSocket();
+        
+        // Kirim sinyal balasan ke sender
+        peer.on('signal', data => {
+            updateStatus('Sending signal data back...');
+            ws.send(JSON.stringify(data));
+        });
+
+        // INI DIA! Saat stream video datang
+        peer.on('stream', stream => {
+            updateStatus('Stream received!');
+            remoteVideo.srcObject = stream;
+        });
+
+        peer.on('connect', () => {
+            updateStatus('Peer Connected!');
+        });
+        
+        peer.on('error', err => updateStatus(`Error: ${err.message}`));
+    };
+    ws.onerror = err => updateStatus(`WebSocket Error: ${err.message}`);
+    ws.onclose = () => updateStatus('WebSocket Disconnected.');
 });

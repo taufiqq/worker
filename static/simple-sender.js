@@ -1,64 +1,48 @@
-// --- START OF FILE public/simple-sender.js ---
 document.addEventListener('DOMContentLoaded', () => {
-    const startButton = document.getElementById('startButton');
-    const localVideo = document.getElementById('localVideo');
-    const statusDiv = document.getElementById('status');
-    const sessionIdDisplay = document.getElementById('sessionId');
-
-    const sessionId = window.location.pathname.split('/')[1];
-    sessionIdDisplay.textContent = sessionId;
-
-    let ws;
-    let peerConnection;
-    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    // ... (kode untuk ambil video, status, dll. tetap sama) ...
     
-    const updateStatus = msg => {
-        console.log(msg);
-        statusDiv.textContent = `Status: ${msg}`;
-    };
-
-    function connectWebSocket() {
+    // ... (kode websocket Anda) ...
+    // ws.onopen, ws.onclose, ws.onmessage
+    
+    startButton.onclick = async () => {
+        startButton.disabled = true;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        localVideo.srcObject = stream;
+        
+        // Buat koneksi WebSocket
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${proto}//${window.location.host}/ws-simple/${sessionId}?role=sender`;
-        updateStatus(`Connecting to WebSocket at ${wsUrl}`);
-        ws = new WebSocket(wsUrl);
+        const ws = new WebSocket(wsUrl);
 
-        ws.onopen = async () => {
-            updateStatus('WebSocket Connected. Creating Peer Connection and Offer...');
-            peerConnection = new RTCPeerConnection(configuration);
-
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            localVideo.srcObject = stream;
-            stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+        ws.onopen = () => {
+            updateStatus('WebSocket Connected. Creating peer...');
             
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    ws.send(JSON.stringify({ type: 'candidate', data: event.candidate }));
-                }
+            // --- INTI DARI SIMPLE-PEER ---
+            const peer = new SimplePeer({
+                initiator: true, // Sender adalah initiator
+                stream: stream,
+                trickle: false // Lebih simpel untuk memulai, mengirim semua kandidat sekaligus
+            });
+
+            // Kirim sinyal ke receiver via WebSocket
+            peer.on('signal', data => {
+                updateStatus('Sending signal data...');
+                ws.send(JSON.stringify(data));
+            });
+            
+            // Terima sinyal dari receiver
+            ws.onmessage = event => {
+                updateStatus('Received signal data...');
+                peer.signal(JSON.parse(event.data));
             };
 
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            ws.send(JSON.stringify({ type: 'offer', data: offer }));
-            updateStatus('Offer sent. Waiting for answer...');
+            peer.on('connect', () => {
+                updateStatus('Peer Connected!');
+            });
+            
+            peer.on('error', err => updateStatus(`Error: ${err.message}`));
         };
-
-        ws.onmessage = async (event) => {
-            const signal = JSON.parse(event.data);
-            updateStatus(`Signal received: ${signal.type}`);
-            if (signal.type === 'answer') {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
-            } else if (signal.type === 'candidate') {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
-            }
-        };
-
+        ws.onerror = err => updateStatus(`WebSocket Error: ${err.message}`);
         ws.onclose = () => updateStatus('WebSocket Disconnected.');
-        ws.onerror = (err) => updateStatus(`WebSocket Error: ${err.message}`);
-    }
-
-    startButton.onclick = () => {
-        startButton.disabled = true;
-        connectWebSocket();
     };
 });
