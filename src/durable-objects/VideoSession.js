@@ -3,14 +3,18 @@
 export class VideoSession {
     constructor(state, env) {
         this.state = state;
-        // Kita akan menyimpan koneksi WebSocket di memori, bukan di storage
         this.streamer = null;
         this.viewer = null;
     }
 
-    // Metode fetch dipanggil saat ada permintaan ke Durable Object ini
     async fetch(request) {
-        // Harapkan permintaan untuk upgrade ke WebSocket
+        // Ambil peran yang dikirim oleh worker utama melalui header
+        const role = request.headers.get('X-Client-Role');
+
+        if (!role || (role !== 'streamer' && role !== 'viewer')) {
+            return new Response('Peran klien tidak valid atau tidak disediakan.', { status: 400 });
+        }
+        
         const upgradeHeader = request.headers.get('Upgrade');
         if (!upgradeHeader || upgradeHeader !== 'websocket') {
             return new Response('Expected Upgrade: websocket', { status: 426 });
@@ -18,41 +22,42 @@ export class VideoSession {
 
         const [client, server] = Object.values(new WebSocketPair());
         
-        // Mulai menangani koneksi WebSocket di sisi server
-        await this.handleSession(server);
+        // Teruskan peran yang sudah divalidasi ke handler
+        await this.handleSession(server, role);
 
-        // Kembalikan sisi klien dari WebSocket ke runtime
         return new Response(null, {
             status: 101,
             webSocket: client,
         });
     }
 
-    async handleSession(ws) {
-        // Terima koneksi
+    async handleSession(ws, role) { // Terima 'role' sebagai argumen
         ws.accept();
 
-        // Tentukan peran koneksi: streamer pertama, lalu viewer
-        let role;
-        if (!this.streamer) {
-            role = 'streamer';
+        // LOGIKA PERAN BARU: Tetapkan koneksi berdasarkan peran yang diberikan
+        if (role === 'streamer') {
+            if (this.streamer) {
+                // Tolak streamer kedua
+                console.log(`[DO ${this.state.id}] Streamer connection rejected, already connected.`);
+                ws.close(1013, 'Streamer already connected');
+                return;
+            }
             this.streamer = ws;
             console.log(`[DO ${this.state.id}] Streamer connected.`);
-        } else if (!this.viewer) {
-            role = 'viewer';
+        } else if (role === 'viewer') {
+            if (this.viewer) {
+                // Tolak viewer kedua (untuk saat ini, bisa dikembangkan untuk multi-viewer)
+                console.log(`[DO ${this.state.id}] Viewer connection rejected, already connected.`);
+                ws.close(1013, 'Viewer already connected');
+                return;
+            }
             this.viewer = ws;
             console.log(`[DO ${this.state.id}] Viewer connected.`);
-        } else {
-            // Sudah ada streamer dan viewer, tolak koneksi baru
-            console.log(`[DO ${this.state.id}] Connection rejected, session full.`);
-            ws.close(1013, 'Session is full');
-            return;
         }
 
-        // Tambahkan event listener untuk pesan dan penutupan
         ws.addEventListener('message', event => {
-            // Relay pesan ke pihak lain
             try {
+                // Logika relay pesan tidak berubah
                 if (role === 'streamer' && this.viewer) {
                     this.viewer.send(event.data);
                 } else if (role === 'viewer' && this.streamer) {
@@ -63,18 +68,17 @@ export class VideoSession {
             }
         });
         
+        // Logika event 'close' juga tidak berubah secara signifikan
         ws.addEventListener('close', event => {
             console.log(`[DO ${this.state.id}] ${role} disconnected. Code: ${event.code}, Reason: ${event.reason}`);
             if (role === 'streamer') {
                 this.streamer = null;
-                // Beri tahu viewer bahwa streamer terputus
                 if (this.viewer) {
                     this.viewer.close(1011, 'Streamer disconnected');
                     this.viewer = null;
                 }
             } else if (role === 'viewer') {
                 this.viewer = null;
-                // Beri tahu streamer bahwa viewer terputus agar bisa menerima koneksi baru
                 if (this.streamer) {
                    this.streamer.send(JSON.stringify({ type: 'viewer-disconnected' }));
                 }

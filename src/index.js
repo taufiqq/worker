@@ -1,56 +1,83 @@
 // --- START OF FILE src/index.js ---
 
 import { Hono } from 'hono';
-
-// 1. Impor Durable Object Anda
 import { VideoSession } from './durable-objects/VideoSession.js';
-
-// 2. Impor semua handler rute Anda
-import { adminAuth } from './middleware/adminAuth.js';
+import { adminAuth } from './middleware/adminAuth.js'; // Pastikan adminAuth diimpor
 import { handleAdminPage } from './routes/admin.js';
 import adminApiRoutes from './routes/adminApi.js';
 import { handleTokenClaim } from './routes/token.js';
 
-
-// 3. Inisialisasi dan pendaftaran rute
 const app = new Hono();
 
-// --- RUTE BARU UNTUK WEBRTC ---
-// Rute untuk menyajikan halaman streamer
-app.get('/video/:id_mobil', (c) => {
+// --- RUTE WEBRTC DENGAN AUTENTIKASI ---
+
+// 1. Proteksi halaman streamer dengan Basic Auth
+app.get('/video/:id_mobil', adminAuth, (c) => {
     return c.env.ASSETS.fetch(new URL('/streamer.html', c.req.url));
 });
 
-// Rute untuk menangani koneksi WebSocket ke Durable Object
-app.get('/api/video/ws/:id_mobil', (c) => {
+// 2. Rute "Penjaga Gerbang" WebSocket yang cerdas
+app.get('/api/video/ws/:id_mobil', async (c) => {
     const id_mobil = c.req.param('id_mobil');
-    if (!id_mobil) {
-        return new Response('id_mobil is required', { status: 400 });
+    const token = c.req.query('token');
+    const authHeader = c.req.header('Authorization');
+    
+    let role = null;
+    let isValid = false;
+
+    // --- Cek Autentikasi Viewer (berdasarkan token) ---
+    if (token) {
+        try {
+            const ps = c.env.DB.prepare('SELECT id FROM tokens WHERE token = ? AND id_mobil = ? AND claimed_by_ip IS NOT NULL');
+            const data = await ps.bind(token, id_mobil).first();
+            if (data) {
+                isValid = true;
+                role = 'viewer';
+            }
+        } catch (e) {
+            console.error("Error validasi token viewer:", e);
+        }
+    } 
+    // --- Cek Autentikasi Streamer (berdasarkan Basic Auth) ---
+    else if (authHeader && authHeader.startsWith('Basic ')) {
+        try {
+            const decodedCreds = atob(authHeader.substring(6));
+            const [user, pass] = decodedCreds.split(':');
+            const adminData = await c.env.ADMIN.get(`admin:${user}`, 'json');
+
+            if (adminData && adminData.pass === pass) {
+                isValid = true;
+                role = 'streamer';
+            }
+        } catch(e) {
+             console.error("Error validasi Basic Auth streamer:", e);
+        }
     }
 
-    // Dapatkan ID unik untuk DO berdasarkan id_mobil
+    // Jika autentikasi gagal, tolak koneksi
+    if (!isValid) {
+        return new Response('Autentikasi WebSocket gagal.', { status: 401 });
+    }
+
+    // Jika berhasil, teruskan ke Durable Object dengan peran yang sudah ditentukan
     const doId = c.env.VIDEO_SESSIONS.idFromName(id_mobil);
-    // Dapatkan stub (objek untuk berinteraksi) dari DO
     const stub = c.env.VIDEO_SESSIONS.get(doId);
     
-    // Teruskan permintaan (termasuk header upgrade) ke DO
-    return stub.fetch(c.req.raw);
+    // Buat request baru untuk menambahkan header kustom
+    const forwardReq = new Request(c.req.raw);
+    forwardReq.headers.set('X-Client-Role', role);
+    
+    return stub.fetch(forwardReq);
 });
 
 
-// --- RUTE LAMA ANDA (TETAP ADA) ---
+// --- RUTE LAMA ANDA ---
 app.get('/admin', adminAuth, handleAdminPage);
-app.route('/api/admin', adminApiRoutes);
+app.route('/api/admin', adminApiApiRoutes);
 app.get('/:token', handleTokenClaim);
-
-// Rute fallback untuk aset statis (selalu paling akhir)
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
-
-// 4. Ekspor utama untuk Cloudflare Worker
 export default {
   fetch: app.fetch,
 };
-
-// 5. Ekspor juga class Durable Object Anda
 export { VideoSession };
