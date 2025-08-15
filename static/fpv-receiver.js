@@ -15,15 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = `Status: ${message}`;
     };
 
-    // Ambil sessionId (id_mobil) dari data global
+    // 1. Ambil data sesi yang disuntikkan (TIDAK DIUBAH DARI KODE ASLI ANDA)
     if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.id_mobil) {
-        updateStatus("Error: Data sesi tidak lengkap.");
+        updateStatus("Error: Data sesi tidak lengkap. Harap akses melalui URL token yang valid.");
         return;
     }
     const sessionId = window.MQTT_CREDENTIALS.id_mobil;
-    const myId = 'viewer'; // ID unik untuk pengirim ini
+    const myId = 'viewer'; // ID untuk membedakan pengirim
 
-    // PENTING: Tambahkan server TURN untuk keandalan maksimal
+    // PENTING: Konfigurasi WebRTC dengan server TURN
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -34,8 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         ]
     };
-
-    // Fungsi untuk mengirim sinyal melalui Supabase
+    
+    // 2. Fungsi untuk mengirim sinyal melalui Supabase (PENGGANTI WebSocket.send)
     async function sendSignal(type, data) {
         const { error } = await supabase.from('webrtc_signals').insert({
             session_id: sessionId,
@@ -43,13 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
             type: type,
             data: data
         });
-        if (error) {
-            console.error('Error sending signal:', error);
-            updateStatus(`Error mengirim sinyal: ${error.message}`);
-        }
+        if (error) console.error('Error sending signal:', error);
     }
-    
-    function startListening() {
+
+    // 3. Fungsi untuk mendengarkan sinyal dari Supabase (PENGGANTI WebSocket.onmessage)
+    function setupSignalListener() {
         updateStatus(`Terhubung. Mendengarkan sinyal untuk sesi: ${sessionId}`);
         const channel = supabase.channel(`webrtc-${sessionId}`);
 
@@ -65,10 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus(`Menerima sinyal: ${signal.type}`);
 
                 if (signal.type === 'offer') {
-                    // Jika ada koneksi lama, tutup dulu
-                    if (peerConnection) {
-                        peerConnection.close();
-                    }
+                    if (peerConnection) peerConnection.close();
+                    
                     peerConnection = new RTCPeerConnection(configuration);
 
                     peerConnection.ontrack = event => {
@@ -79,9 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     };
                     peerConnection.onicecandidate = e => {
-                        if (e.candidate) {
-                            sendSignal('candidate', e.candidate);
-                        }
+                        if (e.candidate) sendSignal('candidate', e.candidate);
                     };
                     peerConnection.onconnectionstatechange = () => {
                         updateStatus(`Status koneksi peer: ${peerConnection.connectionState}`);
@@ -94,11 +88,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 } else if (signal.type === 'candidate' && peerConnection) {
                     await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
+                } else if (signal.type === 'streamer-disconnected') { // Ini mungkin tidak akan terkirim lagi, tapi tidak apa-apa
+                     updateStatus('Streamer telah memutus koneksi. Menunggu untuk terhubung kembali...');
+                     if (peerConnection) peerConnection.close();
+                     remoteVideo.srcObject = null;
                 }
             }
         ).subscribe();
     }
-    
-    // Mulai koneksi
-    startListening();
+
+    // 4. Mulai koneksi (TIDAK DIUBAH DARI KODE ASLI ANDA)
+    setupSignalListener();
 });

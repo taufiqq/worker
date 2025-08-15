@@ -19,15 +19,15 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = `Status: ${message}`;
     };
 
-    // Baca Session ID (id_mobil) dari URL
+    // 1. Baca Session ID (id_mobil) dari URL (TIDAK DIUBAH DARI KODE ASLI ANDA)
     const pathSegments = window.location.pathname.split('/');
     const sessionId = pathSegments[pathSegments.length - 1];
-    const myId = 'streamer'; // ID unik untuk pengirim ini
+    const myId = 'streamer'; // ID untuk membedakan pengirim
 
     sessionIdDisplay.textContent = sessionId;
     startButton.disabled = false;
 
-    // PENTING: Tambahkan server TURN untuk keandalan maksimal
+    // PENTING: Konfigurasi WebRTC dengan server TURN
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ]
     };
 
-    // Fungsi untuk mengirim sinyal melalui Supabase
+    // 2. Fungsi untuk mengirim sinyal melalui Supabase (PENGGANTI WebSocket.send)
     async function sendSignal(type, data) {
         const { error } = await supabase.from('webrtc_signals').insert({
             session_id: sessionId,
@@ -47,14 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
             type: type,
             data: data
         });
-        if (error) {
-            console.error('Error sending signal:', error);
-            updateStatus(`Error mengirim sinyal: ${error.message}`);
-        }
+        if (error) console.error('Error sending signal:', error);
     }
     
-    // Fungsi untuk memulai mendengarkan sinyal dari Supabase
-    function listenToSignals() {
+    // 3. Fungsi untuk mendengarkan sinyal dari Supabase (PENGGANTI WebSocket.onmessage)
+    function setupSignalListener() {
         const channel = supabase.channel(`webrtc-${sessionId}`);
         
         channel.on(
@@ -69,18 +66,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus(`Menerima sinyal: ${signal.type}`);
 
                 if (signal.type === 'answer') {
-                    if (peerConnection.currentRemoteDescription) return; // Hindari memproses answer ganda
+                    if (peerConnection.currentRemoteDescription) return;
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.data));
                 } else if (signal.type === 'candidate') {
                     await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
                 }
             }
-        ).subscribe();
-
-        updateStatus('Mendengarkan sinyal dari viewer...');
+        ).subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                updateStatus('Terhubung ke Supabase. Siap mengirim offer.');
+            } else {
+                updateStatus(`Status Supabase: ${status}`);
+            }
+        });
     }
 
-    // Logika saat tombol "Start" diklik
+    // 4. Logika saat tombol "Start" diklik (hampir tidak berubah)
     startButton.onclick = async () => {
         startButton.disabled = true;
         updateStatus('Memulai kamera...');
@@ -100,15 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    sendSignal('candidate', event.candidate);
-                }
+                if (event.candidate) sendSignal('candidate', event.candidate);
             };
             peerConnection.onconnectionstatechange = () => updateStatus(`Status koneksi peer: ${peerConnection.connectionState}`);
-            
-            // Dengarkan sinyal dari viewer SEBELUM mengirim offer
-            listenToSignals();
 
+            // Mulai mendengarkan, lalu kirim offer
+            setupSignalListener(); 
+            
             updateStatus('Membuat dan mengirim offer...');
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
