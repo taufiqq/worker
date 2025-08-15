@@ -18,18 +18,13 @@ binding = "DB" # Nama variabel yang akan digunakan di kode Worker
 database_name = "tokens"
 database_id = "0c98dba8-35ca-4ba4-a7ae-6fd5617985f4"
 
-#[[durable_objects.bindings]]
-#name = "WEBSOCKET_DO" # Nama ini harus sama dengan yang digunakan di index.js (c.env.WEBSOCKET_DO)
-#class_name = "WebSocketDO" # Nama kelas yang diekspor dari file .do.js
-
-# ---> TAMBAHKAN DUA BARIS DI BAWAH INI <---
 [[durable_objects.bindings]]
-name = "WEBRTC_DO"
-class_name = "WebRTCDurableObject"
+name = "WEBSOCKET_DO" # Nama ini harus sama dengan yang digunakan di index.js (c.env.WEBSOCKET_DO)
+class_name = "WebSocketDO" # Nama kelas yang diekspor dari file .do.js
 
 
 # TAMBAHKAN BAGIAN INI
 [[migrations]]
-tag = "v3" # Anda bisa menamainya apa saja
-new_sqlite_classes = [ "WebRTCDurableObject" ]
-deleted_classes = ["SimpleWebRTC_DO","WebSocketDO"]
+tag = "v1" # Anda bisa menamainya apa saja
+new_sqlite_classes = [ "WebSocketDO" ]
+deleted_classes = ["WebRTCDurableObject"]
