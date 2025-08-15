@@ -47,10 +47,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("getUserMedia error:", error);
         return;
     }
+    if (!window.ADMIN_CREDENTIALS || !window.ADMIN_CREDENTIALS.user) {
+        updateStatus("Error: Kredensial admin tidak ditemukan. Gagal memulai koneksi.");
+        return;
+    }
     
     // 3. Hubungkan ke WebSocket Server (Durable Object)
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}`;
+    const { user, pass } = window.ADMIN_CREDENTIALS;
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}?user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`;
+    
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
