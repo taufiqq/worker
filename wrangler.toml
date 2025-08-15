@@ -6,7 +6,7 @@ compatibility_date = "2023-12-01"
 
 
 [assets]
-directory = "./static"
+directory = "./public"
 binding = "ASSETS"
 
 [[kv_namespaces]]
@@ -24,11 +24,12 @@ class_name = "WebSocketDO" # Nama kelas yang diekspor dari file .do.js
 
 # ---> TAMBAHKAN DUA BARIS DI BAWAH INI <---
 [[durable_objects.bindings]]
-name = "SIMPLE_WEBRTC_DO"
-class_name = "SimpleWebRTC_DO"
+name = "WEBRTC_DO"
+class_name = "WebRTCDurableObject"
 
 
 # TAMBAHKAN BAGIAN INI
 [[migrations]]
 tag = "v2" # Anda bisa menamainya apa saja
-new_sqlite_classes = [ "SimpleWebRTC_DO" ]
+new_sqlite_classes = [ "WebRTCDurableObject" ]
+deleted_classes = ["SimpleWebRTC_DO"]
