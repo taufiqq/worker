@@ -1,14 +1,21 @@
-// File: src/durable-objects/websocket.do.js (VERSI DENGAN BUFFER CANDIDATE)
+// File: src/durable-objects/websocket.do.js
+// VERSI PALING TANGGUH - "Simpan Semuanya"
 
 import { DurableObject } from "cloudflare:workers";
 
 export class WebSocketDO extends DurableObject {
-    streamer = null;
-    viewer = null; 
-    latestOffer = null;
-    
-    // --- PERUBAHAN 1: Tambahkan buffer untuk menyimpan candidate dari streamer ---
-    streamerCandidates = [];
+    // State disimpan dalam satu objek agar mudah di-reset
+    session = this.resetSession();
+
+    // Fungsi helper untuk mereset state ke kondisi awal
+    resetSession() {
+        return {
+            streamer: null,        // Koneksi WebSocket streamer
+            viewer: null,          // Koneksi WebSocket viewer
+            streamerMessages: [],  // "Kotak surat" untuk pesan DARI streamer KE viewer
+            viewerMessages: [],    // "Kotak surat" untuk pesan DARI viewer KE streamer
+        };
+    }
 
     constructor(ctx, env) {
         super(ctx, env);
@@ -19,14 +26,9 @@ export class WebSocketDO extends DurableObject {
         const url = new URL(request.url);
         const pathSegments = url.pathname.split('/');
         const idMobil = pathSegments[pathSegments.length - 1];
-        
-        console.log(`[DO ${idMobil}] Menerima fetch. URL: ${url.pathname}`);
 
         if (url.pathname === '/_set_stream_secret') {
-            console.log(`[DO ${idMobil}] Menangani '/_set_stream_secret'`);
-            const streamSecret = await request.text();
-            if (!streamSecret) return new Response('Secret tidak boleh kosong', { status: 400 });
-            await this.ctx.storage.put('stream_secret', streamSecret);
+            await this.ctx.storage.put('stream_secret', await request.text());
             return new Response('Secret tersimpan', { status: 200 });
         }
         
@@ -52,11 +54,9 @@ export class WebSocketDO extends DurableObject {
         }
 
         if (!role) {
-            console.log(`[DO ${idMobil}] AUTH GAGAL. Peran tidak ditemukan.`);
             return new Response('Token autentikasi tidak valid', { status: 403 });
         }
         
-        console.log(`[DO ${idMobil}] AUTH BERHASIL. Peran: ${role}`);
         const [client, server] = Object.values(new WebSocketPair());
         this.handleSession(server, role, idMobil);
         return new Response(null, { status: 101, webSocket: client });
@@ -67,83 +67,75 @@ export class WebSocketDO extends DurableObject {
         console.log(`[DO ${idMobil}] Koneksi diterima. Peran: ${role}`);
 
         if (role === 'streamer') {
-            if (this.streamer) this.streamer.close(1000, 'Streamer baru terhubung');
-            this.streamer = socket;
+            // Jika ada streamer lama, putuskan koneksinya.
+            if (this.session.streamer) {
+                this.session.streamer.close(1012, 'Sesi diambil alih oleh streamer baru.');
+            }
+            // **RESET TOTAL SEMUA STATE SAAT STREAMER BARU DATANG**
+            console.log(`[DO ${idMobil}] STREAMER BARU TERHUBUNG. Mereset seluruh state sesi.`);
+            this.session = this.resetSession();
+            this.session.streamer = socket;
             
-            // --- PERUBAHAN 2: Reset state saat streamer baru terhubung ---
-            this.latestOffer = null;
-            this.streamerCandidates = [];
-
-            if (this.viewer) this.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
+            // Hapus secret setelah digunakan
             this.ctx.storage.delete('stream_secret');
 
-        } else { // role === 'viewer'
-            if (this.viewer) this.viewer.close(1000, 'Viewer baru terhubung');
-            this.viewer = socket;
+            // Coba kirim pesan yang mungkin sudah dikirim viewer duluan
+            this.flushMessages(this.session.viewerMessages, this.session.streamer, 'viewer', idMobil);
 
-            // --- PERUBAHAN 3: Kirim offer DAN semua candidate yang sudah dibuffer ---
-            if (this.latestOffer) {
-                console.log(`[DO ${idMobil}] Mengirimkan offer yang sudah ada ke viewer baru.`);
-                socket.send(JSON.stringify({ type: 'offer', data: this.latestOffer }));
-                
-                console.log(`[DO ${idMobil}] Mengirimkan ${this.streamerCandidates.length} candidate yang dibuffer.`);
-                for (const candidate of this.streamerCandidates) {
-                    socket.send(JSON.stringify({ type: 'candidate', data: candidate }));
-                }
+        } else { // role === 'viewer'
+            // Jika ada viewer lama, putuskan koneksinya.
+            if (this.session.viewer) {
+                this.session.viewer.close(1012, 'Sesi diambil alih oleh viewer baru.');
             }
+            this.session.viewer = socket;
+            this.session.viewerMessages = []; // Kosongkan kotak surat viewer lama
+
+            // Kirim semua pesan yang sudah menumpuk dari streamer
+            this.flushMessages(this.session.streamerMessages, this.session.viewer, 'streamer', idMobil);
         }
 
-        socket.addEventListener('message', event => this.handleMessage(socket, role, event.data, idMobil));
+        socket.addEventListener('message', event => {
+            console.log(`[DO ${idMobil}] Menerima pesan dari: ${role}`);
+            const recipient = (role === 'streamer') ? this.session.viewer : this.session.streamer;
+            const mailbox = (role === 'streamer') ? this.session.streamerMessages : this.session.viewerMessages;
+
+            // Jika penerima sudah ada, langsung kirim.
+            if (recipient) {
+                recipient.send(event.data);
+            } else {
+                // Jika penerima belum ada, SIMPAN di kotak surat.
+                console.log(`[DO ${idMobil}] Penerima (${role === 'streamer' ? 'viewer' : 'streamer'}) belum ada. MENYIMPAN PESAN.`);
+                mailbox.push(event.data);
+            }
+        });
         
         const closeOrErrorHandler = () => {
-            if (role === 'streamer' && socket === this.streamer) {
-                this.streamer = null; 
-                this.latestOffer = null;
-                // --- PERUBAHAN 5: Kosongkan buffer candidate saat streamer disconnect ---
-                this.streamerCandidates = [];
-                if (this.viewer) {
-                    this.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
+            if (role === 'streamer' && socket === this.session.streamer) {
+                console.log(`[DO ${idMobil}] Streamer AKTIF terputus.`);
+                // Saat streamer putus, sesi dianggap berakhir. Reset total.
+                this.session = this.resetSession();
+                // Beri tahu viewer (jika masih terhubung) bahwa sesi berakhir.
+                if (this.session.viewer) {
+                   this.session.viewer.send(JSON.stringify({ type: 'streamer-disconnected' }));
                 }
-            } else if (role === 'viewer' && socket === this.viewer) {
-                this.viewer = null;
+            } else if (role === 'viewer' && socket === this.session.viewer) {
+                console.log(`[DO ${idMobil}] Viewer AKTIF terputus.`);
+                this.session.viewer = null;
+                this.session.viewerMessages = []; // Kosongkan kotak suratnya
             }
-            console.log(`[DO ${idMobil}] Koneksi ditutup. Peran: ${role}`);
         };
         socket.addEventListener('close', closeOrErrorHandler);
         socket.addEventListener('error', closeOrErrorHandler);
     }
     
-    handleMessage(senderSocket, role, message, idMobil) {
-    try {
-        const signal = JSON.parse(message);
-        
-        if (role === 'streamer') {
-            if (signal.type === 'offer') {
-                this.latestOffer = signal.data;
+    // Fungsi untuk "mengosongkan" kotak surat dan mengirim semua isinya
+    flushMessages(mailbox, recipient, senderRole, idMobil) {
+        if (recipient && mailbox.length > 0) {
+            console.log(`[DO ${idMobil}] Mengirim ${mailbox.length} pesan tersimpan dari ${senderRole} ke penerima.`);
+            for (const msg of mailbox) {
+                recipient.send(msg);
             }
-            
-            if (signal.type === 'candidate') {
-                if (this.viewer) {
-                    console.log(`[DO ${idMobil}] Candidate dari streamer, VIEWER ADA. Langsung kirim.`);
-                    this.viewer.send(message);
-                } else {
-                    console.log(`[DO ${idMobil}] Candidate dari streamer, VIEWER BELUM ADA. Buffer. Ukuran buffer sekarang: ${this.streamerCandidates.length + 1}`);
-                    this.streamerCandidates.push(signal.data);
-                }
-                return; 
-            }
-
-            if (this.viewer) {
-                this.viewer.send(message);
-            }
-
-        } else if (role === 'viewer') {
-            console.log(`[DO ${idMobil}] Menerima sinyal '${signal.type}' dari viewer. Meneruskan ke streamer.`);
-            if (this.streamer) {
-                this.streamer.send(message);
-            }
+            mailbox.length = 0; // Kosongkan array setelah dikirim
         }
-    } catch (error) {
-        console.error(`[DO ${idMobil}] Gagal memproses pesan:`, error);
     }
 }
