@@ -73,7 +73,7 @@ app.get('/api/video/ws/:id_mobil', async (c) => {
 
 // --- RUTE LAMA ANDA ---
 app.get('/admin', adminAuth, handleAdminPage);
-app.route('/api/admin', adminApiApiRoutes);
+app.route('/api/admin', adminApiRoutes);
 app.get('/:token', handleTokenClaim);
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
