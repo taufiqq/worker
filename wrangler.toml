@@ -19,12 +19,11 @@ database_name = "tokens"
 database_id = "0c98dba8-35ca-4ba4-a7ae-6fd5617985f4"
 
 [[durable_objects.bindings]]
-name = "WEBSOCKET_DO" # Nama ini harus sama dengan yang digunakan di index.js (c.env.WEBSOCKET_DO)
-class_name = "WebSocketDO" # Nama kelas yang diekspor dari file .do.js
-
+name = "VIDEO_SESSIONS" # Nama ini harus sama dengan yang diakses di `c.env.VIDEO_SESSIONS`
+class_name = "VideoSession" # Nama class yang kita buat di VideoSession.js
 
 # TAMBAHKAN BAGIAN INI
 [[migrations]]
-tag = "v1" # Anda bisa menamainya apa saja
-new_sqlite_classes = [ "WebSocketDO" ]
-deleted_classes = ["WebRTCDurableObject"]
+tag = "v2" # Anda bisa menamainya apa saja
+new_sqlite_classes = [ "VideoSession" ]
+deleted_classes = ["WebSocketDO"]
