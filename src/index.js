@@ -21,7 +21,7 @@ const app = new Hono();
 // --- RUTE LAMA ANDA (TETAP ADA) ---
 app.get('/admin', adminAuth, handleAdminPage);
 app.route('/api/admin', adminApiRoutes);
-app.get('/video/:id_mobil', adminAuth, handleVideoStreamPage);
+app.get('/video/:id_mobil', handleVideoStreamPage);
 app.get('/:token', handleTokenClaim);
 app.get('/ws/:sessionId', handleWebSocketUpgrade);
 
