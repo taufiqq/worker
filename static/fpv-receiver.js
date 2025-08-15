@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let ws; // Variabel WebSocket
 
     const updateStatus = (message) => {
-        console.log(message);
+//        console.log(message);
         statusDiv.textContent = `Status: ${message}`;
     };
 
