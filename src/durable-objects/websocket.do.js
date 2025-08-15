@@ -114,39 +114,36 @@ export class WebSocketDO extends DurableObject {
     }
     
     handleMessage(senderSocket, role, message, idMobil) {
-        try {
-            const signal = JSON.parse(message);
-            
-            if (role === 'streamer') {
-                if (signal.type === 'offer') {
-                    this.latestOffer = signal.data;
-                }
-                
-                // --- PERUBAHAN 4: Logika inti - buffer atau kirim candidate ---
-                if (signal.type === 'candidate') {
-                    if (this.viewer) {
-                        // Jika viewer sudah ada, langsung kirim
-                        this.viewer.send(message);
-                    } else {
-                        // Jika viewer belum ada, simpan di buffer
-                        this.streamerCandidates.push(signal.data);
-                    }
-                    return; // Hentikan eksekusi di sini untuk candidate
-                }
-
-                // Untuk pesan lain (seperti offer), kirim jika viewer ada
-                if (this.viewer) {
-                    this.viewer.send(message);
-                }
-
-            } else if (role === 'viewer') {
-                // Pesan dari Viewer (answer, candidate) HANYA untuk Streamer
-                if (this.streamer) {
-                    this.streamer.send(message);
-                }
+    try {
+        const signal = JSON.parse(message);
+        
+        if (role === 'streamer') {
+            if (signal.type === 'offer') {
+                this.latestOffer = signal.data;
             }
-        } catch (error) {
-            console.error(`[DO ${idMobil}] Gagal memproses pesan:`, error);
+            
+            if (signal.type === 'candidate') {
+                if (this.viewer) {
+                    console.log(`[DO ${idMobil}] Candidate dari streamer, VIEWER ADA. Langsung kirim.`);
+                    this.viewer.send(message);
+                } else {
+                    console.log(`[DO ${idMobil}] Candidate dari streamer, VIEWER BELUM ADA. Buffer. Ukuran buffer sekarang: ${this.streamerCandidates.length + 1}`);
+                    this.streamerCandidates.push(signal.data);
+                }
+                return; 
+            }
+
+            if (this.viewer) {
+                this.viewer.send(message);
+            }
+
+        } else if (role === 'viewer') {
+            console.log(`[DO ${idMobil}] Menerima sinyal '${signal.type}' dari viewer. Meneruskan ke streamer.`);
+            if (this.streamer) {
+                this.streamer.send(message);
+            }
         }
+    } catch (error) {
+        console.error(`[DO ${idMobil}] Gagal memproses pesan:`, error);
     }
 }

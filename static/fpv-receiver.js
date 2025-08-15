@@ -49,6 +49,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const signal = JSON.parse(event.data);
             updateStatus(`Menerima sinyal: ${signal.type}`);
 
+
+
+
+
+try { // Tambahkan try-catch di sini!
+        if (signal.type === 'offer') {
+            // ... kode offer Anda ...
+            
+        } else if (signal.type === 'candidate' && peerConnection) {
+            console.log("VIEWER: Mencoba menambahkan ICE candidate yang diterima:", signal.data);
+            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.data));
+            console.log("VIEWER: Berhasil menambahkan ICE candidate.");
+        } else if (signal.type === 'streamer-disconnected') {
+            // ... kode disconnect Anda ...
+        }
+    } catch (e) {
+        console.error("VIEWER: Gagal memproses sinyal!", e);
+        updateStatus(`Error memproses sinyal: ${e.message}`);
+    }
+    
+    
+    
+    
+    
             if (signal.type === 'offer') {
                 if (peerConnection) {
                     peerConnection.close();
