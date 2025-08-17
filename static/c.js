@@ -128,7 +128,6 @@ function showKickOverlay(text) {
     overlay.innerHTML = `<div>⚠️<br><br>${text}</div>`;
     overlay.style.display = 'flex';
 }
-client.connect(connectOptions);
 
 // --- LOGIKA UTAMA PERHITUNGAN RODA ---
 const wheelState = { kanan: 0, kiri: 0, belok: 0 };
