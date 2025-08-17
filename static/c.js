@@ -4,7 +4,9 @@
 const controlState = { steering: 0, gas: 0, brake: 0, gasActive: false, timerGas: 100, timerBelok: 350, terakhirBelok: 0, terakhirGas: 0 };
 const debugDisplay = document.getElementById('debug-display');
 const activeControls = new Map();
-const initialPositions = new Map();
+const initialPositions = new Map()
+const idMobil = window.MQTT_CREDENTIALS.id_mobil;
+
 let animationFrameId;
 
 document.querySelectorAll('.movable-control').forEach(movable => {
@@ -96,34 +98,22 @@ gasButton.addEventListener('touchend', () => { controlState.gasActive = false; }
 
 
 // --- BAGIAN LOGIKA MQTT & GAME ---
-if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.user) {
-    document.body.innerHTML = '<h1 style="color:red; font-family: sans-serif; text-align:center; margin-top: 20vh;">Error: Halaman ini harus diakses melalui URL dengan token yang valid.</h1>';
-    throw new Error("MQTT Credentials not injected. Cannot connect.");
+function mulaiWebsocket(){
+  ws = new WebSocket(`wss://${window.location.host}/mqtt/${idMobil}?p=penonton`);
+  ws.onopen = () => {}
+  ws.onclose = () => {
+    setTimeout(mulaiWebsocket,5000);
+  }
 }
 
-const MQTT_HOST = 'xf46ce9c.ala.asia-southeast1.emqxsl.com';
-const MQTT_PORT = 8084;
-const MQTT_CLIENT_ID = `game_controller_paho_${window.MQTT_CREDENTIALS.user}_${Math.random().toString(16).substr(2, 4)}`;
-const client = new Paho.Client(MQTT_HOST, MQTT_PORT, MQTT_CLIENT_ID);
-client.onConnectionLost = onConnectionLost;
-client.onMessageArrived = onMessageArrived;
-const connectOptions = { useSSL: true, userName: window.MQTT_CREDENTIALS.user, password: window.MQTT_CREDENTIALS.pass, onSuccess: onConnect, onFailure: onConnectionFailure, reconnect: true };
-function onConnect() {
-    console.log('Berhasil terhubung ke broker MQTT!');
-    const kickTopic = `system/kick/${window.MQTT_CREDENTIALS.user}`;
-    client.subscribe(kickTopic);
-    console.log(`Berlangganan ke topik kick: ${kickTopic}`);
+function kirimPesan(pesan){
+  if ( ws.readyState === WebSocket.OPEN){
+    ws.send(pesan);
+  }
 }
-function onConnectionFailure(response) { console.error('Koneksi MQTT Gagal:', response.errorMessage); showKickOverlay("Gagal terhubung ke server kontrol. Coba muat ulang halaman."); }
-function onConnectionLost(response) { if (response.errorCode !== 0) { console.log("Koneksi MQTT terputus:", response.errorMessage); showKickOverlay("Koneksi terputus. Harap periksa internet Anda dan muat ulang halaman."); } }
-function onMessageArrived(message) {
-    const kickTopic = `system/kick/${window.MQTT_CREDENTIALS.user}`;
-    if (message.destinationName === kickTopic) {
-        console.warn("Menerima sinyal KICK dari server!");
-        client.disconnect();
-        showKickOverlay("Sesi Anda telah diakhiri oleh admin. Silakan dapatkan link akses baru.");
-    }
-}
+
+
+
 function showKickOverlay(text) {
     if (animationFrameId) { cancelAnimationFrame(animationFrameId); }
     const gameControls = document.querySelector('.game-controls');
@@ -151,7 +141,16 @@ function mapValueToLevel(inputValue, levelsConfig) {
 }
 function processWheelCommands(belok, gas) {
     let targetRodaKiri = 0, targetRodaKanan = 0;
-    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) { publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/belok', (92 - belok).toString()); wheelState.belok = belok; controlState.terakhirBelok = Date.now(); }
+    if (belok !== wheelState.belok && controlState.timerBelok < Date.now() - controlState.terakhirBelok ) {
+      let ledDepan = 0;
+      if (belok  < 0 ) {
+        ledDepan = 1;
+      } else if (belok > 0){
+        ledDepan = 2;
+      } else {
+        ledDepan = 0;
+      }
+      kirimPesan(`${idMobil}a${92 - belok}/${ledDepan}`); wheelState.belok = belok; controlState.terakhirBelok = Date.now(); }
     switch (belok) {
         case 0: targetRodaKiri = gas; targetRodaKanan = gas; break;
         case 20: targetRodaKiri = gas; targetRodaKanan = gas * 0.8; break;
@@ -162,11 +161,14 @@ function processWheelCommands(belok, gas) {
     targetRodaKiri = Math.round(targetRodaKiri);
     targetRodaKanan = Math.round(targetRodaKanan);
     if(controlState.timerGas < Date.now() - controlState.terakhirGas){
-      if (targetRodaKiri !== wheelState.kiri) { wheelState.kiri = targetRodaKiri; publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/kiri', wheelState.kiri.toString()); controlState.terakhirGas = Date.now(); }
-      if (targetRodaKanan !== wheelState.kanan) { wheelState.kanan = targetRodaKanan; publishMqtt(window.MQTT_CREDENTIALS.id_mobil + '/kanan', wheelState.kanan.toString()); controlState.terakhirGas = Date.now(); }
+      if (targetRodaKiri !== wheelState.kiri) { wheelState.kiri = targetRodaKiri;
+        let ledKiri = (wheelState.kiri > wheelState.kanan) ? 0 : 1;
+        kirimPesan(`${idMobil}b${wheelState.kiri}/${ledKiri}`); controlState.terakhirGas = Date.now(); }
+      if (targetRodaKanan !== wheelState.kanan) { wheelState.kanan = targetRodaKanan; let ledKanan = (wheelState.kanan > wheelState.kiri) ? 0 : 1;
+        kirimPesan(`${idMobil}c${wheelState.kanan}/${ledKanan}`);
+        controlState.terakhirGas = Date.now(); }
     }
 }
-function publishMqtt(topic, message) { if (client.isConnected()) { const mqttMessage = new Paho.Message(message); mqttMessage.destinationName = topic; mqttMessage.qos = 0; client.send(mqttMessage); } }
 
 // --- GAME LOOP ---
 function updateGameData() {
