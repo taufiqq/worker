@@ -1,4 +1,5 @@
 // streamer.js
+// Salin dan ganti seluruh isi file ini.
 
 document.addEventListener('DOMContentLoaded', async () => {
     const localVideo = document.getElementById('localVideo');
@@ -8,8 +9,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Konfigurasi ---
     const VIDEO_CONSTRAINTS = {
-        // Resolusi landscape lebih cocok untuk C.html, tapi kita ikuti permintaan
-        // Anda bisa menukar width/height jika perlu
         width: { ideal: 320 }, 
         height: { ideal: 640 },
         frameRate: { ideal: 24 }
@@ -60,34 +59,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
-        updateStatus("Terhubung ke server sinyal. Memulai WebRTC...");
-        startWebRTC();
+        // --- PERUBAHAN UTAMA DI SINI ---
+        // Jangan mulai WebRTC dulu. Tunggu aba-aba dari server.
+        updateStatus("Terhubung ke server sinyal. Menunggu viewer terhubung...");
     };
     
     ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
         console.log("Menerima pesan:", data);
 
-        if (data.type === 'answer') {
+        // --- LOGIKA BARU DI SINI ---
+        if (data.type === 'initiate-webrtc') {
+            updateStatus("Viewer terhubung! Memulai koneksi WebRTC...");
+            startWebRTC();
+        } else if (data.type === 'answer') {
+            if (!peerConnection || peerConnection.signalingState !== 'have-local-offer') {
+                console.warn('Received an answer without having a local offer. Ignoring.');
+                return;
+            }
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
             updateStatus("Koneksi WebRTC berhasil dibuat! Streaming aktif.");
         } else if (data.type === 'ice-candidate') {
+            if (!peerConnection) return;
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
         } else if (data.type === 'viewer-disconnected') {
             updateStatus("Viewer terputus. Menunggu koneksi baru...");
-            // Buat ulang koneksi untuk viewer baru
-            startWebRTC();
+            // Cukup tutup koneksi peer yang lama. 
+            // Koneksi baru akan diinisiasi oleh pesan 'initiate-webrtc' berikutnya.
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
         }
     };
 
     ws.onclose = () => {
         updateStatus("Koneksi ke server sinyal terputus.");
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
     };
     ws.onerror = (error) => {
         updateStatus("Error koneksi WebSocket.");
         console.error("WebSocket Error:", error);
     };
-
 
     function startWebRTC() {
         if (peerConnection) {
@@ -95,25 +111,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         peerConnection = new RTCPeerConnection(STUN_SERVERS);
 
-        // Tambahkan track video ke koneksi
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-        // Kirim ICE candidates ke peer lain
         peerConnection.onicecandidate = (event) => {
             if (event.candidate && ws.readyState === WebSocket.OPEN) {
-                console.log("Mengirim ICE candidate...");
                 ws.send(JSON.stringify({ type: 'ice-candidate', payload: event.candidate }));
             }
         };
 
-        // Buat 'offer' untuk memulai koneksi
         peerConnection.createOffer()
             .then(offer => peerConnection.setLocalDescription(offer))
             .then(() => {
                 if (ws.readyState === WebSocket.OPEN) {
                     console.log("Mengirim offer...");
                     ws.send(JSON.stringify({ type: 'offer', payload: peerConnection.localDescription }));
-                    updateStatus("Menunggu jawaban dari viewer...");
+                    updateStatus("Offer terkirim. Menunggu jawaban dari viewer...");
                 }
             })
             .catch(e => updateStatus(`Error membuat offer: ${e}`));

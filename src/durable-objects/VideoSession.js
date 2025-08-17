@@ -1,4 +1,6 @@
 // src/durable-objects/VideoSession.js
+// Salin dan ganti seluruh isi file ini.
+// Versi ini sudah menggabungkan perbaikan sebelumnya dan perbaikan baru.
 
 export class VideoSession {
     constructor(state, env) {
@@ -7,9 +9,7 @@ export class VideoSession {
         this.viewer = null;
     }
 
-    // ... metode fetch tidak berubah ...
     async fetch(request) {
-        // Ambil peran yang dikirim oleh worker utama melalui header
         const role = request.headers.get('X-Client-Role');
 
         if (!role || (role !== 'streamer' && role !== 'viewer')) {
@@ -23,7 +23,6 @@ export class VideoSession {
 
         const [client, server] = Object.values(new WebSocketPair());
         
-        // Teruskan peran yang sudah divalidasi ke handler
         await this.handleSession(server, role);
 
         return new Response(null, {
@@ -32,33 +31,43 @@ export class VideoSession {
         });
     }
 
-
     async handleSession(ws, role) {
         ws.accept();
 
         if (role === 'streamer') {
-            // --- PERUBAHAN UTAMA DI SINI ---
             if (this.streamer) {
-                // Jika sudah ada streamer, anggap ini rekoneksi.
-                // Tutup koneksi lama dengan baik.
                 console.log(`[DO ${this.state.id}] Streamer is reconnecting. Replacing old connection.`);
                 this.streamer.close(1012, 'Reconnecting'); 
             }
-            this.streamer = ws; // Tetapkan koneksi BARU
+            this.streamer = ws;
             console.log(`[DO ${this.state.id}] Streamer connected.`);
-        } else if (role === 'viewer') {
-            // --- PERUBAHAN UTAMA DI SINI ---
+            
+            // LOGIKA BARU: Jika streamer terhubung dan viewer sudah menunggu,
+            // suruh streamer untuk memulai koneksi.
             if (this.viewer) {
-                // Jika sudah ada viewer, anggap ini rekoneksi.
+                console.log(`[DO ${this.state.id}] Viewer was waiting. Telling streamer to initiate WebRTC.`);
+                this.streamer.send(JSON.stringify({ type: 'initiate-webrtc' }));
+            }
+
+        } else if (role === 'viewer') {
+            if (this.viewer) {
                 console.log(`[DO ${this.state.id}] Viewer is reconnecting. Replacing old connection.`);
                 this.viewer.close(1012, 'Reconnecting');
             }
-            this.viewer = ws; // Tetapkan koneksi BARU
+            this.viewer = ws;
             console.log(`[DO ${this.state.id}] Viewer connected.`);
+
+            // LOGIKA BARU: Jika viewer terhubung dan streamer sudah siap,
+            // suruh streamer untuk memulai koneksi.
+            if (this.streamer) {
+                console.log(`[DO ${this.state.id}] Streamer is ready. Telling streamer to initiate WebRTC.`);
+                this.streamer.send(JSON.stringify({ type: 'initiate-webrtc' }));
+            }
         }
 
         ws.addEventListener('message', event => {
             try {
+                // Relay logic tetap sama
                 if (role === 'streamer' && this.viewer) {
                     this.viewer.send(event.data);
                 } else if (role === 'viewer' && this.streamer) {
@@ -72,9 +81,6 @@ export class VideoSession {
         ws.addEventListener('close', event => {
             console.log(`[DO ${this.state.id}] ${role} disconnected. Code: ${event.code}, Reason: ${event.reason}`);
             
-            // --- PENYEMPURNAAN PENTING ---
-            // Pastikan kita hanya membersihkan state jika koneksi yang ditutup
-            // adalah koneksi yang sedang aktif, bukan koneksi lama yang sudah diganti.
             if (role === 'streamer' && this.streamer === ws) {
                 this.streamer = null;
                 if (this.viewer) {
