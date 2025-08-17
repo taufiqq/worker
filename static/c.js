@@ -6,6 +6,7 @@ const debugDisplay = document.getElementById('debug-display');
 const activeControls = new Map();
 const initialPositions = new Map()
 const idMobil = window.MQTT_CREDENTIALS.id_mobil;
+let ws;
 
 let animationFrameId;
 
