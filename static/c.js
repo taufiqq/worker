@@ -99,10 +99,13 @@ gasButton.addEventListener('touchend', () => { controlState.gasActive = false; }
 
 // --- BAGIAN LOGIKA MQTT & GAME ---
 function mulaiWebsocket(){
-  ws = new WebSocket(`wss://${window.location.host}/mqtt/${idMobil}?p=penonton`);
-  ws.onopen = () => {}
+  ws = new WebSocket(`wss://${window.location.host}/mqtt/${idMobil}?p=pemain`);
+  ws.onopen = () => {
+    console.log("sukses");
+  }
   ws.onclose = () => {
     setTimeout(mulaiWebsocket,5000);
+    console.log("error mulai dalam 5 detik");
   }
 }
 
