@@ -23,7 +23,7 @@ name = "VIDEO_SESSIONS"
 class_name = "VideoSession" 
 
 [[durable_objects.bindings]]
-name = "CAR_SESSIONS" 
+name = "CAR_SESSION" 
 class_name = "CarSession" 
 
 # TAMBAHKAN BAGIAN INI
