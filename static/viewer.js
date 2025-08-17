@@ -90,9 +90,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Saat track video diterima, tampilkan di elemen <video>
         peerConnection.ontrack = (event) => {
+            if (peerConnection) {
+            peerConnection.close();
+        }
+        peerConnection = new RTCPeerConnection(STUN_SERVERS);
+
+        // --- PERUBAHAN UTAMA DI SINI ---
+        peerConnection.ontrack = (event) => {
             updateStatus("Stream video diterima!");
             if (remoteVideo) {
+                // Langkah 1: Tetapkan sumber stream seperti biasa
                 remoteVideo.srcObject = event.streams[0];
+
+                // Langkah 2: Beri perintah eksplisit untuk memutar video
+                // Ini mengatasi masalah di mana browser tidak memulai pemutaran otomatis
+                const playPromise = remoteVideo.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        // Autoplay dicegah oleh browser. Ini umum terjadi.
+                        // Biasanya karena pengguna belum berinteraksi dengan halaman.
+                        console.error("Autoplay gagal:", error);
+                        updateStatus("Stream diterima. Klik video untuk memulai.");
+                        // Anda bisa menambahkan overlay "klik untuk memutar" di sini
+                    });
+                }
             }
         };
 
