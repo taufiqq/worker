@@ -7,6 +7,7 @@ export class VideoSession {
         this.viewer = null;
     }
 
+    // ... metode fetch tidak berubah ...
     async fetch(request) {
         // Ambil peran yang dikirim oleh worker utama melalui header
         const role = request.headers.get('X-Client-Role');
@@ -31,33 +32,33 @@ export class VideoSession {
         });
     }
 
-    async handleSession(ws, role) { // Terima 'role' sebagai argumen
+
+    async handleSession(ws, role) {
         ws.accept();
 
-        // LOGIKA PERAN BARU: Tetapkan koneksi berdasarkan peran yang diberikan
         if (role === 'streamer') {
+            // --- PERUBAHAN UTAMA DI SINI ---
             if (this.streamer) {
-                // Tolak streamer kedua
-                console.log(`[DO ${this.state.id}] Streamer connection rejected, already connected.`);
-                ws.close(1013, 'Streamer already connected');
-                return;
+                // Jika sudah ada streamer, anggap ini rekoneksi.
+                // Tutup koneksi lama dengan baik.
+                console.log(`[DO ${this.state.id}] Streamer is reconnecting. Replacing old connection.`);
+                this.streamer.close(1012, 'Reconnecting'); 
             }
-            this.streamer = ws;
+            this.streamer = ws; // Tetapkan koneksi BARU
             console.log(`[DO ${this.state.id}] Streamer connected.`);
         } else if (role === 'viewer') {
+            // --- PERUBAHAN UTAMA DI SINI ---
             if (this.viewer) {
-                // Tolak viewer kedua (untuk saat ini, bisa dikembangkan untuk multi-viewer)
-                console.log(`[DO ${this.state.id}] Viewer connection rejected, already connected.`);
-                ws.close(1013, 'Viewer already connected');
-                return;
+                // Jika sudah ada viewer, anggap ini rekoneksi.
+                console.log(`[DO ${this.state.id}] Viewer is reconnecting. Replacing old connection.`);
+                this.viewer.close(1012, 'Reconnecting');
             }
-            this.viewer = ws;
+            this.viewer = ws; // Tetapkan koneksi BARU
             console.log(`[DO ${this.state.id}] Viewer connected.`);
         }
 
         ws.addEventListener('message', event => {
             try {
-                // Logika relay pesan tidak berubah
                 if (role === 'streamer' && this.viewer) {
                     this.viewer.send(event.data);
                 } else if (role === 'viewer' && this.streamer) {
@@ -68,16 +69,19 @@ export class VideoSession {
             }
         });
         
-        // Logika event 'close' juga tidak berubah secara signifikan
         ws.addEventListener('close', event => {
             console.log(`[DO ${this.state.id}] ${role} disconnected. Code: ${event.code}, Reason: ${event.reason}`);
-            if (role === 'streamer') {
+            
+            // --- PENYEMPURNAAN PENTING ---
+            // Pastikan kita hanya membersihkan state jika koneksi yang ditutup
+            // adalah koneksi yang sedang aktif, bukan koneksi lama yang sudah diganti.
+            if (role === 'streamer' && this.streamer === ws) {
                 this.streamer = null;
                 if (this.viewer) {
                     this.viewer.close(1011, 'Streamer disconnected');
                     this.viewer = null;
                 }
-            } else if (role === 'viewer') {
+            } else if (role === 'viewer' && this.viewer === ws) {
                 this.viewer = null;
                 if (this.streamer) {
                    this.streamer.send(JSON.stringify({ type: 'viewer-disconnected' }));
