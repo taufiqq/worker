@@ -90,13 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Saat track video diterima, tampilkan di elemen <video>
         peerConnection.ontrack = (event) => {
-            if (peerConnection) {
-            peerConnection.close();
-        }
-        peerConnection = new RTCPeerConnection(STUN_SERVERS);
-
-        // --- PERUBAHAN UTAMA DI SINI ---
-        peerConnection.ontrack = (event) => {
             updateStatus("Stream video diterima!");
             if (remoteVideo) {
                 // Langkah 1: Tetapkan sumber stream seperti biasa
