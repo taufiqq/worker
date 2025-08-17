@@ -108,7 +108,11 @@ function mulaiWebsocket(){
     setTimeout(mulaiWebsocket,5000);
     console.log("error mulai dalam 5 detik");
   }
+  ws.onmessage = async(e) => {
+    console.log(e);
+  }
 }
+mulaiWebsocket();
 
 function kirimPesan(pesan){
   if ( ws.readyState === WebSocket.OPEN){
