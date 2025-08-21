@@ -10,7 +10,7 @@
     <style>
         /* CSS Anda tidak perlu diubah, jadi saya persingkat di sini */
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; background-color: #111; }
-        .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); color: white; display: flex; justify-content: center; align-items: center; text-align: center; flex-direction: column; z-index: 1000; cursor: pointer; }
+        .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 1); color: white; display: flex; justify-content: center; align-items: center; text-align: center; flex-direction: column; z-index: 1000; cursor: pointer; }
         #start-overlay h1 { font-size: 24px; }
         .ui-container { z-index:10; position: relative; width: 100vw; height: 100vh; color: white; display: flex; flex-direction: column; justify-content: space-between; }
         .controls-wrapper { position: absolute; bottom: 40px; left: 50px; right: 50px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -62,8 +62,7 @@
     </div>
     
     <div id="start-overlay" class="fullscreen-overlay">
-        <h1>Ketuk untuk Memulai</h1>
-        <p>(Aplikasi akan masuk ke mode layar penuh & landscape)</p>
+        <h1>START</h1>
     </div>
 
     <div class="ui-container">
@@ -76,14 +75,14 @@
                 </div>
             </div>
             <div class="right-controls">
-                <div class="r-button">                        <div class="hamburger-icon"><span class="line"></span><span class="line"></span><span class="line"></span>
+                <div class="r-button" id="belakang">                        <div class="hamburger-icon"><span class="line"></span><span class="line"></span><span class="line"></span>
                         </div>
                       </div>
                 <div class="vertical-slider-track">
                     <div class="vertical-slider-handle" id="vertical-slider">
                         <div class="hamburger-icon"><span class="line"></span><span class="line"></span><span class="line"></span>
                         <span class="line"></span>
-                        <span class="line"></span>
+                        
                         </div>
                     </div>
                 </div>
@@ -175,6 +174,8 @@ function kirimPesanRodaKiriKanan(){
     roda = 230;
   } else if (nilai > 8) {
     roda = 255;
+  } else if(nilai < 0){
+    roda = -230;
   }
   rodaKiri = roda * pengali.kiri;
   rodaKanan = roda * pengali.kanan;
@@ -184,7 +185,7 @@ function kirimPesanRodaKiriKanan(){
     } else {
       kodeLed = 1;
     }
-    kirimPesan(`b/${rodaKiri}/${kodeLed}`);
+    kirimPesan(`b/${Math.round(rodaKiri)}/${kodeLed}`);
     nilaiTerakhir.rodaKiri = rodaKiri;
   }
   if(rodaKanan !== nilaiTerakhir.rodaKanan){
@@ -193,7 +194,7 @@ function kirimPesanRodaKiriKanan(){
     } else {
       kodeLed = 1;
     }
-    kirimPesan(`c/${rodaKanan}/${kodeLed}`);
+    kirimPesan(`c/${Math.round(rodaKanan)}/${kodeLed}`);
     nilaiTerakhir.rodaKanan = rodaKanan;
   }
 }
@@ -247,13 +248,13 @@ function dragMoveListener(event) {
         const currentPosition = x + (totalRange / 2);
         horizontalSliderValue = Math.max(0, Math.min(10, (currentPosition / totalRange) * 10));
         console.log(`Horizontal Value: ${horizontalSliderValue.toFixed(2)}`);
-        kirimPesanRodaKiriKanan();
+        kirimPesanRodaDepan();
     } else if (target.id === 'vertical-slider') {
         const totalRange = track.offsetHeight - target.offsetHeight;
         const currentPosition = -y;
         verticalSliderValue = Math.max(0, Math.min(10, (currentPosition / totalRange) * 10));
         console.log(`Vertical Value: ${verticalSliderValue.toFixed(2)}`);
-        kirimPesanRodaDepan();
+        kirimPesanRodaKiriKanan();
     }
 }
 
@@ -294,6 +295,14 @@ interact('#vertical-slider').draggable({
     lockAxis: 'y', startAxis: 'y',
     modifiers: [interact.modifiers.restrictRect({ restriction: 'parent' })],
     listeners: { move: dragMoveListener }
+});
+
+interact('belakang').on('down',(event) => {
+  verticalSliderValue = -1;
+  kirimPesanRodaKiriKanan();
+}).on('up', (event) => {
+  verticalSliderValue = 0;
+  kirimPesanRodaKiriKanan();
 });
 
 handleDragEvents('#horizontal-slider');
