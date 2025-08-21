@@ -6,21 +6,20 @@ import { adminAuth } from '../middleware/adminAuth.js';
 const videoRoutes = new Hono();
 
 // --- RUTE HALAMAN STREAMER ---
-// Rute ini menggunakan middleware adminAuth dan menyuntikkan kredensial ke HTML.
+// Rute ini tidak perlu diubah. Ia sudah berfungsi dengan baik untuk menyajikan
+// halaman dan menyuntikkan kredensial yang akan kita gunakan.
 videoRoutes.get('/video/:id_mobil', adminAuth, async (c) => {
-    // Ambil kredensial dari header Basic Auth yang sudah divalidasi oleh middleware
     const authHeader = c.req.header('Authorization');
     const decodedCreds = atob(authHeader.substring(6));
     const [user, pass] = decodedCreds.split(':');
 
-    // Ambil file HTML aset
     const asset = await c.env.ASSETS.fetch(new URL('/streamer.html', c.req.url));
     
-    // Siapkan data untuk disuntikkan
     const injectionData = { user, pass };
+    // Kita akan suntikkan token base64-nya langsung untuk mempermudah.
+    injectionData.basicToken = btoa(`${user}:${pass}`);
     const injectionScript = `<script>window.ADMIN_CREDENTIALS = ${JSON.stringify(injectionData)};</script>`;
 
-    // Gunakan HTMLRewriter untuk menyuntikkan skrip
     return new HTMLRewriter()
       .on('body', {
         element: (element) => {
@@ -30,37 +29,39 @@ videoRoutes.get('/video/:id_mobil', adminAuth, async (c) => {
       .transform(asset);
 });
 
-// --- RUTE "PENJAGA GERBANG" WEBSOCKET ---
-// Rute ini mengautentikasi dan meneruskan koneksi ke Durable Object.
+// --- RUTE "PENJAGA GERBANG" WEBSOCKET (DIPERBARUI) ---
 videoRoutes.get('/api/video/ws/:id_mobil', async (c) => {
     const id_mobil = c.req.param('id_mobil');
-    const token = c.req.query('token');
-    const adminUser = c.req.query('user');
-    const adminPass = c.req.query('pass');
+    const viewerToken = c.req.query('token');
+    const authToken = c.req.query('auth'); // Parameter baru: 'auth'
     
     let role = null;
     let isValid = false;
 
     // Cek Autentikasi Viewer (berdasarkan token)
-    if (token) {
+    if (viewerToken) {
         try {
             const ps = c.env.DB.prepare('SELECT id FROM tokens WHERE token = ? AND id_mobil = ? AND claimed_by_ip IS NOT NULL');
-            const data = await ps.bind(token, id_mobil).first();
+            const data = await ps.bind(viewerToken, id_mobil).first();
             if (data) {
                 isValid = true;
                 role = 'viewer';
             }
         } catch (e) { console.error("Error validasi token viewer:", e); }
     } 
-    // Cek Autentikasi Streamer (berdasarkan query user/pass)
-    else if (adminUser && adminPass) {
+    // Cek Autentikasi Streamer (berdasarkan query 'auth')
+    else if (authToken) {
         try {
-            const adminData = await c.env.ADMIN.get(`admin:${adminUser}`, 'json');
-            if (adminData && adminData.pass === adminPass) {
+            // Logika ini meniru middleware adminAuth
+            const decodedCreds = atob(authToken);
+            const [user, pass] = decodedCreds.split(':');
+            const adminData = await c.env.ADMIN.get(`admin:${user}`, 'json');
+            
+            if (adminData && adminData.pass === pass) {
                 isValid = true;
                 role = 'streamer';
             }
-        } catch(e) { console.error("Error validasi Basic Auth streamer:", e); }
+        } catch(e) { console.error("Error validasi Basic Auth streamer via query:", e); }
     }
 
     // Jika autentikasi gagal, tolak koneksi
@@ -68,11 +69,10 @@ videoRoutes.get('/api/video/ws/:id_mobil', async (c) => {
         return new Response('Autentikasi WebSocket gagal.', { status: 401 });
     }
 
-    // Jika berhasil, teruskan ke Durable Object dengan peran yang sudah ditentukan
+    // Jika berhasil, teruskan ke Durable Object
     const doId = c.env.VIDEO_SESSIONS.idFromName(id_mobil);
     const stub = c.env.VIDEO_SESSIONS.get(doId);
     
-    // Buat request baru untuk menambahkan header kustom
     const forwardReq = new Request(c.req.raw);
     forwardReq.headers.set('X-Client-Role', role);
     

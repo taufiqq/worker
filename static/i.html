@@ -120,7 +120,7 @@ document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 // --- BAGIAN LOGIKA MQTT & GAME ---
 function mulaiWebsocket(){
   const {id_mobil} = window;
-  ws = new WebSocket(`wss://${window.location.host}/mqtt/${id_mobil}?p=pemain&token=${window.location.slice(1)}`);
+  ws = new WebSocket(`wss://${window.location.host}/mqtt/${id_mobil}?p=pemain&token=${window.location.pathname.slice(1)}`);
   ws.onopen = () => {
     console.log("sukses");
   }

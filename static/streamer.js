@@ -46,21 +46,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("getUserMedia error:", error);
         return;
     }
-    if (!window.ADMIN_CREDENTIALS || !window.ADMIN_CREDENTIALS.user) {
-        updateStatus("Error: Kredensial admin tidak ditemukan. Gagal memulai koneksi.");
+    
+    // --- PERUBAHAN UTAMA DI SINI ---
+    // Pastikan kredensial yang sudah di-encode ada
+    if (!window.ADMIN_CREDENTIALS || !window.ADMIN_CREDENTIALS.basicToken) {
+        updateStatus("Error: Token autentikasi admin tidak ditemukan. Gagal memulai koneksi.");
         return;
     }
     
-    // 3. Hubungkan ke WebSocket Server (Durable Object)
+    // 3. Hubungkan ke WebSocket Server menggunakan token 'auth'
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const { user, pass } = window.ADMIN_CREDENTIALS;
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}?user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`;
+    const { basicToken } = window.ADMIN_CREDENTIALS;
+    // URL sekarang lebih bersih, hanya menggunakan satu parameter 'auth'
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/video/ws/${id_mobil}?auth=${basicToken}`;
     
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
-        // --- PERUBAHAN UTAMA DI SINI ---
-        // Jangan mulai WebRTC dulu. Tunggu aba-aba dari server.
         updateStatus("Terhubung ke server sinyal. Menunggu viewer terhubung...");
     };
     
@@ -68,7 +70,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = JSON.parse(event.data);
         console.log("Menerima pesan:", data);
 
-        // --- LOGIKA BARU DI SINI ---
         if (data.type === 'initiate-webrtc') {
             updateStatus("Viewer terhubung! Memulai koneksi WebRTC...");
             startWebRTC();
@@ -84,8 +85,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
         } else if (data.type === 'viewer-disconnected') {
             updateStatus("Viewer terputus. Menunggu koneksi baru...");
-            // Cukup tutup koneksi peer yang lama. 
-            // Koneksi baru akan diinisiasi oleh pesan 'initiate-webrtc' berikutnya.
             if (peerConnection) {
                 peerConnection.close();
                 peerConnection = null;
@@ -97,7 +96,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateStatus("Koneksi ke server sinyal terputus.");
         if (peerConnection) {
             peerConnection.close();
-            peerConnection = null;
         }
     };
     ws.onerror = (error) => {
