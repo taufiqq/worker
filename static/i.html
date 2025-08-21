@@ -297,7 +297,7 @@ interact('#vertical-slider').draggable({
     listeners: { move: dragMoveListener }
 });
 
-interact('belakang').on('down',(event) => {
+interact('#belakang').on('down',(event) => {
   verticalSliderValue = -1;
   kirimPesanRodaKiriKanan();
 }).on('up', (event) => {
