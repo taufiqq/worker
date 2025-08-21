@@ -2,8 +2,8 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Pastikan halaman ini memiliki kredensial yang disuntikkan
-    if (!window.MQTT_CREDENTIALS || !window.MQTT_CREDENTIALS.id_mobil) {
-        console.warn("Kredensial MQTT atau id_mobil tidak ditemukan. WebRTC tidak akan dimulai.");
+    if (!window.id_mobil) {
+        console.warn("id_mobil tidak ditemukan. WebRTC tidak akan dimulai.");
         return;
     }
 
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function connect() {
-        const { id_mobil } = window.MQTT_CREDENTIALS;
+        const { id_mobil } = window;
         updateStatus(`Menghubungkan ke stream video untuk mobil ID: ${id_mobil}`);
 
         const token = window.location.pathname.substring(1);

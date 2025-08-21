@@ -13,7 +13,7 @@ export const handleTokenClaim = async (c) => {
 
     try {
         // 1. Cek apakah token ada di database
-        const ps = c.env.DB.prepare('SELECT id, user, pass, id_mobil, claimed_by_ip FROM tokens WHERE token = ?');
+        const ps = c.env.DB.prepare('SELECT id, id_mobil, claimed_by_ip FROM tokens WHERE token = ?');
         const data = await ps.bind(token).first();
 
         // KASUS 1: TOKEN TIDAK VALID / TIDAK DITEMUKAN
@@ -64,18 +64,12 @@ export const handleTokenClaim = async (c) => {
  */
 async function serveSuccessPage(c, credentials, token) {
     try {
-        const asset = await c.env.ASSETS.fetch(new URL('/C.html', c.req.url));
+        const asset = await c.env.ASSETS.fetch(new URL('/i.html', c.req.url));
         let html = await asset.text();
         
         // Suntikkan semua data yang diperlukan untuk MQTT dan WebRTC
-        const injectionData = {
-            user: credentials.user,
-            pass: credentials.pass,
-            id: credentials.id,
-            id_mobil: credentials.id_mobil
-        };
         
-        const injectionScript = `<script>window.MQTT_CREDENTIALS = ${JSON.stringify(injectionData)};</script>`;
+        const injectionScript = `<script>window.id_mobil = ${credentials.id_mobil};</script>`;
         html = html.replace('</body>', `${injectionScript}</body>`);
         
         const response = new Response(html, asset);
