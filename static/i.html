@@ -172,7 +172,7 @@ function kirimPesanRodaKiriKanan(){
     kodeLed = 0;
   } else if(nilai > 0 && nilai < 8){
     roda = 230;
-  } else if (nilai > 8) {
+  } else if (nilai >= 8) {
     roda = 255;
   } else if(nilai < 0){
     roda = -230;
@@ -211,7 +211,7 @@ function kirimPesanRodaDepan(){
     BelokSaatIni = 90-20;
     kodeLed = 1;
     pengali.kiri = 0.85;
-  } else if(nilai > 4 && nilai < 6){
+  } else if(nilai >= 4 && nilai <= 6){
     BelokSaatIni = 90;
     kodeLed = 0;
     pengali.kiri = 1;
@@ -247,13 +247,11 @@ function dragMoveListener(event) {
         const totalRange = track.offsetWidth - target.offsetWidth;
         const currentPosition = x + (totalRange / 2);
         horizontalSliderValue = Math.max(0, Math.min(10, (currentPosition / totalRange) * 10));
-        console.log(`Horizontal Value: ${horizontalSliderValue.toFixed(2)}`);
         kirimPesanRodaDepan();
     } else if (target.id === 'vertical-slider') {
         const totalRange = track.offsetHeight - target.offsetHeight;
         const currentPosition = -y;
         verticalSliderValue = Math.max(0, Math.min(10, (currentPosition / totalRange) * 10));
-        console.log(`Vertical Value: ${verticalSliderValue.toFixed(2)}`);
         kirimPesanRodaKiriKanan();
     }
 }
@@ -275,11 +273,8 @@ function handleDragEvents(selector) {
             // Reset nilai data
             if (target.id === 'horizontal-slider') {
                 horizontalSliderValue = 5;
-                console.log("Horizontal Reset to 5.00");
                 kirimPesanRodaDepan();
             } else if (target.id === 'vertical-slider') {
-                verticalSliderValue = 0;
-                console.log("Vertical Reset to 0.00");
                 kirimPesanRodaKiriKanan();
             }
         });
