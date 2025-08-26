@@ -205,24 +205,24 @@ function kirimPesanRodaDepan(){
   let kodeLed;
   if(nilai == 0){
     BelokSaatIni = 90-35;
-    kodeLed = 1;
+    kodeLed = 3;
     pengali.kiri = 0.7;
   } else if(nilai > 0 && nilai < 4) {
     BelokSaatIni = 90-20;
-    kodeLed = 1;
+    kodeLed = 4;
     pengali.kiri = 0.85;
   } else if(nilai >= 4 && nilai <= 6){
     BelokSaatIni = 90;
-    kodeLed = 0;
+    kodeLed = 5;
     pengali.kiri = 1;
     pengali.kanan = 1;
   } else if(nilai > 6 && nilai < 10){
     BelokSaatIni = 90+20;
-    kodeLed = 2;
+    kodeLed = 6;
     pengali.kanan = 0.85;
   } else if(nilai == 10){
     BelokSaatIni = 90+35;
-    kodeLed = 2;
+    kodeLed = 7;
     pengali.kanan = 0.7;
   }
   if(nilaiTerakhir.belok !== BelokSaatIni){
