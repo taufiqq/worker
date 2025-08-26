@@ -32,16 +32,9 @@ export class CarSession {
     if (clientType === 'pemain' && this.pemainSocket) {
       return new Response('Pemain sudah terhubung ke sesi ini.', { status: 403 });
     }
-    // --- Kode BARU yang disarankan ---
-if (clientType === 'esp32' && this.esp32Socket) {
-  console.log('ESP32 mencoba koneksi baru, sementara koneksi lama (mungkin zombie) masih tercatat. Menutup koneksi lama...');
-  // Kirim kode penutupan yang jelas, misal 1012 (service restart) atau 4001 (custom)
-  // Ini untuk memberitahu klien lama (jika masih hidup) bahwa ia ditendang.
-  this.esp32Socket.close(1012, 'Reconnecting'); 
-  
-  // Secara paksa bersihkan state, jangan menunggu event 'close'
-  this.esp32Socket = null; 
-}
+    if (clientType === 'esp32' && this.esp32Socket) {
+      return new Response('ESP32 sudah terhubung ke sesi ini.', { status: 403 });
+    }
 
     const { 0: client, 1: server } = new WebSocketPair();
 
