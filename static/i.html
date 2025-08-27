@@ -176,23 +176,20 @@ function kirimPesanRodaKiriKanan(){
     roda = 255;
   } else if(nilai < 0){
     roda = -230;
+    kodeLed = -1;
   }
   rodaKiri = roda * pengali.kiri;
   rodaKanan = roda * pengali.kanan;
   if(rodaKiri !== nilaiTerakhir.rodaKiri){
-    if (rodaKiri > rodaKanan && kodeLed !== 0){
+    if (rodaKiri > rodaKanan && kodeLed === 1){
       kodeLed = 2;
-    } else {
-      kodeLed = 1;
     }
     kirimPesan(`b/${Math.round(rodaKiri)}/${kodeLed}`);
     nilaiTerakhir.rodaKiri = rodaKiri;
   }
   if(rodaKanan !== nilaiTerakhir.rodaKanan){
-    if (rodaKanan > rodaKiri && kodeLed !== 0){
+    if (rodaKanan > rodaKiri && kodeLed === 1){
       kodeLed = 2;
-    } else {
-      kodeLed = 1;
     }
     kirimPesan(`c/${Math.round(rodaKanan)}/${kodeLed}`);
     nilaiTerakhir.rodaKanan = rodaKanan;
@@ -275,6 +272,7 @@ function handleDragEvents(selector) {
                 horizontalSliderValue = 5;
                 kirimPesanRodaDepan();
             } else if (target.id === 'vertical-slider') {
+              verticalSliderValue = 0;
                 kirimPesanRodaKiriKanan();
             }
         });

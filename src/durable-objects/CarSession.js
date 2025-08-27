@@ -33,7 +33,7 @@ export class CarSession {
       return new Response('Pemain sudah terhubung ke sesi ini.', { status: 403 });
     }
     if (clientType === 'esp32' && this.esp32Socket) {
-      return new Response('ESP32 sudah terhubung ke sesi ini.', { status: 403 });
+//      return new Response('ESP32 sudah terhubung ke sesi ini.', { status: 403 });
     }
 
     const { 0: client, 1: server } = new WebSocketPair();
