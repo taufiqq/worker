@@ -200,6 +200,8 @@ function kirimPesanRodaKiriKanan(){
 
 function kirimPesanRodaDepan(){
   const nilai = Math.round(horizontalSliderValue);
+  // nanti ditambah if
+  nilai = 10 - nilai;
   let BelokSaatIni;
   let kodeLed;
   if(nilai == 0){
@@ -225,8 +227,7 @@ function kirimPesanRodaDepan(){
     pengali.kanan = 0.7;
   }
   if(nilaiTerakhir.belok !== BelokSaatIni){
-    let dataSementaraBelok = 180 - BelokSaatIni;
-    kirimPesan(`a/${dataSementaraBelok}/${kodeLed}`);
+    kirimPesan(`a/${BelokSaatIni}/${kodeLed}`);
     nilaiTerakhir.belok = BelokSaatIni;
     kirimPesanRodaKiriKanan();
   }
