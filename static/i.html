@@ -225,7 +225,8 @@ function kirimPesanRodaDepan(){
     pengali.kanan = 0.7;
   }
   if(nilaiTerakhir.belok !== BelokSaatIni){
-    kirimPesan(`a/${BelokSaatIni}/${kodeLed}`);
+    let dataSementaraBelok = 180 - BelokSaatIni;
+    kirimPesan(`a/${dataSementaraBelok}/${kodeLed}`);
     nilaiTerakhir.belok = BelokSaatIni;
     kirimPesanRodaKiriKanan();
   }
