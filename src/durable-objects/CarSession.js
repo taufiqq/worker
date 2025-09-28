@@ -57,6 +57,9 @@ export class CarSession {
 
     socket.addEventListener('message', (event) => {
       console.log(`Pesan diterima dari ${clientType}: ${event.data}`);
+      if (clientType === 'esp32' && event.data == 'p'){
+        this.esp32Socket.send('p');
+      } else
       if (clientType === 'pemain' && this.esp32Socket) {
         this.esp32Socket.send(event.data);
       } else if (clientType === 'esp32' && this.pemainSocket) {
@@ -70,7 +73,7 @@ export class CarSession {
       if (clientType === 'pemain') {
         this.pemainSocket = null;
         if (this.esp32Socket) {
-          this.esp32Socket.send(JSON.stringify({ event: 'player_disconnected' }));
+          this.esp32Socket.send('disconnect');
         }
       } else {
         this.esp32Socket = null;
